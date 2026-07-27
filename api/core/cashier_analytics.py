@@ -112,19 +112,40 @@ def save_cashier_import(filename: str, parsed: Dict[str, Any]) -> Dict[str, Any]
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",(iid,r.get('tab_number'),r['full_name'],r.get('position'),r.get('days_worked',0),r.get('operations_count',0),r.get('operations_minutes',0),r.get('bek_count',0),r.get('bek_minutes',0),r.get('front_count',0),r.get('front_minutes',0),json.dumps(r['metrics'],ensure_ascii=False)))
     return {"import_id":iid,"imported":len(parsed['records']),"header_rows":parsed['header_rows']}
 
-def cashier_analytics(import_id: int | None = None) -> Dict[str, Any]:
+def _enrich_cashier(x: Dict[str, Any], include_metrics: bool = False) -> Dict[str, Any]:
+    x['avg_seconds_per_operation'] = round(x['operations_minutes'] * 60 / x['operations_count'], 1) if x['operations_count'] else 0
+    x['operations_per_day'] = round(x['operations_count'] / x['days_worked'], 1) if x['days_worked'] else 0
+    raw = json.loads(x.pop('metrics_json') or '{}')
+    if include_metrics:
+        x['metrics'] = sorted(({"name": n, "count": round(v.get('count', 0)), "minutes": round(v.get('minutes', 0))} for n, v in raw.items()), key=lambda z: z['count'], reverse=True)
+    return x, raw
+
+
+def cashier_analytics(import_id: int | None = None, page: int = 1, page_size: int = 25) -> Dict[str, Any]:
     with _connect() as c:
         if import_id is None:
-            x=c.execute("SELECT id FROM cashier_imports ORDER BY id DESC LIMIT 1").fetchone(); import_id=x['id'] if x else None
-        if not import_id: return {"summary":{},"cashiers":[],"categories":[],"import":None}
-        info=c.execute("SELECT * FROM cashier_imports WHERE id=?",(import_id,)).fetchone()
-        rows=[dict(x) for x in c.execute("SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC",(import_id,))]
-    total_ops=sum(x['operations_count'] for x in rows); total_min=sum(x['operations_minutes'] for x in rows)
-    cats={}
+            x = c.execute("SELECT id FROM cashier_imports ORDER BY id DESC LIMIT 1").fetchone(); import_id = x['id'] if x else None
+        if not import_id: return {"summary": {}, "cashiers": [], "categories": [], "import": None, "page": 1, "total_pages": 1, "total": 0}
+        info = c.execute("SELECT * FROM cashier_imports WHERE id=?", (import_id,)).fetchone()
+        rows = [dict(x) for x in c.execute("SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC", (import_id,))]
+    total_ops = sum(x['operations_count'] for x in rows); total_min = sum(x['operations_minutes'] for x in rows)
+    cats = {}
     for x in rows:
-        x['avg_seconds_per_operation']=round(x['operations_minutes']*60/x['operations_count'],1) if x['operations_count'] else 0
-        x['operations_per_day']=round(x['operations_count']/x['days_worked'],1) if x['days_worked'] else 0
-        for n,v in json.loads(x.pop('metrics_json') or '{}').items():
-            b=cats.setdefault(n,{'name':n,'count':0,'minutes':0}); b['count']+=v.get('count',0); b['minutes']+=v.get('minutes',0)
-    categories=sorted(cats.values(),key=lambda x:x['count'],reverse=True)
-    return {"import":dict(info),"summary":{"cashiers":len(rows),"operations":round(total_ops),"minutes":round(total_min),"avg_seconds_per_operation":round(total_min*60/total_ops,1) if total_ops else 0,"bek_operations":round(sum(x['bek_count'] for x in rows)),"front_operations":round(sum(x['front_count'] for x in rows))},"cashiers":rows,"categories":categories}
+        _, raw = _enrich_cashier(x)
+        for n, v in raw.items():
+            b = cats.setdefault(n, {'name': n, 'count': 0, 'minutes': 0}); b['count'] += v.get('count', 0); b['minutes'] += v.get('minutes', 0)
+    total = len(rows); page = max(1, page); page_size = max(1, min(page_size, 100)); start = (page - 1) * page_size
+    categories = sorted(cats.values(), key=lambda x: x['count'], reverse=True)
+    return {"import": dict(info), "summary": {"cashiers": total, "operations": round(total_ops), "minutes": round(total_min), "avg_seconds_per_operation": round(total_min*60/total_ops,1) if total_ops else 0, "bek_operations": round(sum(x['bek_count'] for x in rows)), "front_operations": round(sum(x['front_count'] for x in rows))}, "cashiers": rows[start:start+page_size], "categories": categories, "page": page, "page_size": page_size, "total": total, "total_pages": max(1, (total + page_size - 1)//page_size)}
+
+
+def cashier_detail(report_id: int) -> Dict[str, Any] | None:
+    with _connect() as c:
+        row = c.execute("SELECT r.*, i.filename, i.imported_at FROM cashier_reports r JOIN cashier_imports i ON i.id=r.import_id WHERE r.id=?", (report_id,)).fetchone()
+        if not row: return None
+        peers = c.execute("SELECT operations_count FROM cashier_reports WHERE import_id=?", (row['import_id'],)).fetchall()
+    item, _ = _enrich_cashier(dict(row), include_metrics=True)
+    values = sorted(float(p['operations_count']) for p in peers)
+    item['rank_by_operations'] = 1 + sum(v > item['operations_count'] for v in values)
+    item['percentile'] = round(100 * sum(v <= item['operations_count'] for v in values) / len(values), 1) if values else 0
+    return item

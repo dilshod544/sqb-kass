@@ -46,7 +46,7 @@ from core.db import (
     bulk_insert_branches,
 )
 from core.importer import parse_xlsx, REQUIRED_FIELDS, parse_branches_xlsx
-from core.cashier_analytics import parse_cashiers_xlsx, save_cashier_import, cashier_analytics
+from core.cashier_analytics import parse_cashiers_xlsx, save_cashier_import, cashier_analytics, cashier_detail
 
 logging.basicConfig(
     level=logging.INFO,
@@ -528,8 +528,20 @@ async def import_cashiers(file: UploadFile = File(..., description="Excel-отч
 
 
 @app.get("/api/cashiers/analytics", summary="KPI, рейтинг и структура операций кассиров")
-async def get_cashier_analytics(import_id: Optional[int] = Query(None)):
-    return cashier_analytics(import_id)
+async def get_cashier_analytics(
+    import_id: Optional[int] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+):
+    return cashier_analytics(import_id, page, page_size)
+
+
+@app.get("/api/cashiers/{report_id}", summary="Углублённая аналитика одного кассира")
+async def get_cashier_detail(report_id: int):
+    item = cashier_detail(report_id)
+    if not item:
+        raise HTTPException(404, "Запись кассира не найдена")
+    return item
 
 
 # ═══════════════════════════════════════════════════════════
