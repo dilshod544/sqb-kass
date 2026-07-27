@@ -75,8 +75,8 @@ def parse_cashiers_xlsx(path: str | Path) -> Dict[str, Any]:
     mapping = [_classify(x) for x in cols]
     if "full_name" not in mapping:
         raise ValueError("Не найдена колонка ФИШ/ФИО кассира. Проверьте шапку XLSX.")
-    records=[]
-    for row in ws.iter_rows(min_row=sub+1, values_only=True):
+    records=[]; errors=[]
+    for row_no, row in enumerate(ws.iter_rows(min_row=sub+1, values_only=True), start=sub+1):
         if not any(v not in (None, "") for v in row): continue
         rec: Dict[str, Any] = {"metrics": {}}
         for i, value in enumerate(row):
@@ -97,10 +97,16 @@ def parse_cashiers_xlsx(path: str | Path) -> Dict[str, Any]:
                 rec["metrics"][group][key]=as_num(value)
         name=rec.get("full_name", "")
         # Ignore totals and blank/report rows.
-        if not name or norm(name) in ("жами", "итого", "total"): continue
+        if not name:
+            errors.append({"row": row_no, "error": "Пустое поле ФИШ"})
+            continue
+        if norm(name) in ("жами", "итого", "total"): continue
         records.append(rec)
     wb.close()
-    return {"records":records, "header_rows":[top,sub], "columns":cols}
+    if not records:
+        preview = "; ".join(str(x) for x in cols[:12])
+        raise ValueError("Не найдено ни одной строки кассира. Проверьте лист и строку шапки. Распознаны колонки: " + preview)
+    return {"records":records, "errors":errors, "header_rows":[top,sub], "columns":cols}
 
 def save_cashier_import(filename: str, parsed: Dict[str, Any]) -> Dict[str, Any]:
     now=datetime.now(timezone.utc).isoformat()

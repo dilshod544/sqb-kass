@@ -522,7 +522,8 @@ async def import_cashiers(file: UploadFile = File(..., description="Excel-отч
         except ValueError as e:
             raise HTTPException(400, str(e))
         return {"ok": True, "filename": file.filename, **save_cashier_import(file.filename, parsed),
-                "columns_detected": parsed["columns"]}
+                "columns_detected": parsed["columns"], "validation_errors": parsed.get("errors", [])[:30],
+                "validation_errors_count": len(parsed.get("errors", []))}
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
