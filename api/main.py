@@ -46,6 +46,7 @@ from core.db import (
     bulk_insert_branches,
 )
 from core.importer import parse_xlsx, REQUIRED_FIELDS, parse_branches_xlsx
+from core.cashier_analytics import parse_cashiers_xlsx, save_cashier_import, cashier_analytics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -501,6 +502,34 @@ def _aggregate_by_region(atms: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         out.append(r)
     out.sort(key=lambda x: x["count"], reverse=True)
     return out
+
+
+# ═══════════════════════════════════════════════════════════
+# АНАЛИТИКА КАССИРОВ — импорт Excel и агрегированные KPI
+# ═══════════════════════════════════════════════════════════
+
+@app.post("/api/cashiers/import", summary="Импорт отчёта KPI кассиров из XLSX")
+async def import_cashiers(file: UploadFile = File(..., description="Excel-отчёт кассиров")):
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(400, "Ожидается .xlsx файл")
+    tmp_dir = tempfile.mkdtemp(prefix="cashier_import_")
+    tmp_path = os.path.join(tmp_dir, file.filename)
+    try:
+        with open(tmp_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        try:
+            parsed = parse_cashiers_xlsx(tmp_path)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return {"ok": True, "filename": file.filename, **save_cashier_import(file.filename, parsed),
+                "columns_detected": parsed["columns"]}
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@app.get("/api/cashiers/analytics", summary="KPI, рейтинг и структура операций кассиров")
+async def get_cashier_analytics(import_id: Optional[int] = Query(None)):
+    return cashier_analytics(import_id)
 
 
 # ═══════════════════════════════════════════════════════════

@@ -104,6 +104,9 @@ def init_db() -> None:
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_branches_region ON branches(region);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_branches_inc ON branches(incassation);")
+    # Таблицы отчётов кассиров живут в отдельном модуле, чтобы не смешивать домены ATM и касс.
+    from .cashier_analytics import init_cashier_tables
+    init_cashier_tables()
     log.info("БД инициализирована: %s", DB_PATH)
 
 
