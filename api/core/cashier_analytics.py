@@ -1,157 +1,78 @@
-"""Импорт и аналитика KPI кассиров из отчёта Excel."""
+"""Exact reader for the Kassirlar bo'yicha Excel report (columns A:AV)."""
 from __future__ import annotations
-import json, re
-from datetime import datetime, timezone
+import json,re
+from datetime import datetime,timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any,Dict
 import openpyxl
 from .db import _connect
 
-
-def norm(v: Any) -> str:
-    s = str(v or "").lower().replace("ё", "е").replace("қ", "к").replace("ў", "у")
-    return re.sub(r"[^a-zа-я0-9]+", " ", s).strip()
-
-def as_num(v: Any) -> float:
-    if v is None or v == "": return 0.0
-    try: return float(v)
-    except (ValueError, TypeError):
-        try: return float(re.sub(r"[^0-9,.-]", "", str(v)).replace(",", "."))
-        except ValueError: return 0.0
-
-def init_cashier_tables() -> None:
-    with _connect() as c:
-        c.execute("""CREATE TABLE IF NOT EXISTS cashier_imports (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, imported_at TEXT NOT NULL,
-          rows_count INTEGER NOT NULL, report_label TEXT)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS cashier_reports (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, import_id INTEGER NOT NULL REFERENCES cashier_imports(id) ON DELETE CASCADE,
-          tab_number TEXT, full_name TEXT NOT NULL, position TEXT, days_worked REAL,
-          operations_count REAL NOT NULL DEFAULT 0, operations_minutes REAL NOT NULL DEFAULT 0,
-          bek_count REAL NOT NULL DEFAULT 0, bek_minutes REAL NOT NULL DEFAULT 0,
-          front_count REAL NOT NULL DEFAULT 0, front_minutes REAL NOT NULL DEFAULT 0,
-          metrics_json TEXT NOT NULL DEFAULT '{}')""")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_cashier_report_import ON cashier_reports(import_id)")
-
-def _headers(ws):
-    # Find the real header, not the densest data row: it contains semantic labels.
-    best, best_score = 1, -1
-    keys = ("фиш", "фио", "табел", "лавозим", "должност", "амалиёт", "операц", "ишлаган")
-    for r in range(1, min(ws.max_row, 12) + 1):
-        values = [norm(x) for x in next(ws.iter_rows(min_row=r, max_row=r, values_only=True))]
-        score = sum(any(k in x for k in keys) for x in values) * 100 + sum(bool(x) for x in values)
-        if score > best_score: best, best_score = r, score
-    # In the supplied reports, group labels are immediately above Сони/Минут.
-    below = list(next(ws.iter_rows(min_row=min(best + 1, ws.max_row), max_row=min(best + 1, ws.max_row), values_only=True)))
-    if sum("минут" in norm(x) or "сони" in norm(x) for x in below) >= 2:
-        return best, best + 1
-    return best, best
-
-def _classify(header: str) -> str | None:
-    h = norm(header)
-    if "фиш" in h or "фио" in h or "кассир" in h and "назорат" not in h: return "full_name"
-    if h in ("табел", "табел номер") or "табел" in h: return "tab_number"
-    if "ишлаган кун" in h or "отработан" in h: return "days_worked"
-    if "лавозим" in h or "должност" in h: return "position"
-    if "жами операция" in h or "жами амалиет" in h or "всего операц" in h: return "operations"
-    if "жами бек" in h or h.startswith("бек фарк"): return "bek"
-    if "жами фронт" in h or h.startswith("фронт фарк"): return "front"
-    return None
-
-def parse_cashiers_xlsx(path: str | Path) -> Dict[str, Any]:
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-    top, sub = _headers(ws)
-    topvals = list(next(ws.iter_rows(min_row=top, max_row=top, values_only=True)))
-    subvals = list(next(ws.iter_rows(min_row=sub, max_row=sub, values_only=True)))
-    inherited = ""
-    cols = []
-    for i in range(max(len(topvals), len(subvals))):
-        group = topvals[i] if i < len(topvals) else None
-        if group not in (None, ""): inherited = str(group)
-        child = subvals[i] if i < len(subvals) else None
-        title = (inherited + " " + str(child or "")).strip()
-        cols.append(title)
-    mapping = [_classify(x) for x in cols]
-    if "full_name" not in mapping:
-        raise ValueError("Не найдена колонка ФИШ/ФИО кассира. Проверьте шапку XLSX.")
-    records=[]; errors=[]
-    for row_no, row in enumerate(ws.iter_rows(min_row=sub+1, values_only=True), start=sub+1):
-        if not any(v not in (None, "") for v in row): continue
-        rec: Dict[str, Any] = {"metrics": {}}
-        for i, value in enumerate(row):
-            if i >= len(mapping): continue
-            kind=mapping[i]; header=cols[i]
-            if kind in ("full_name", "tab_number", "position"):
-                if kind: rec[kind]=str(value).strip() if value is not None else ""
-            elif kind == "days_worked": rec[kind]=as_num(value)
-            elif kind in ("operations", "bek", "front"):
-                # child name determines count vs minutes
-                suffix="minutes" if "минут" in norm(header) else "count"
-                rec[f"{kind}_{suffix}"]=as_num(value)
-            elif value not in (None, ""):
-                # All other operation groups are available for charts as dynamic categories.
-                group=norm(header).replace(" сони", "").replace(" минут", "")[:100]
-                rec["metrics"][group]=rec["metrics"].get(group, {"count":0,"minutes":0})
-                key="minutes" if "минут" in norm(header) else "count"
-                rec["metrics"][group][key]=as_num(value)
-        name=rec.get("full_name", "")
-        # Ignore totals and blank/report rows.
-        if not name:
-            errors.append({"row": row_no, "error": "Пустое поле ФИШ"})
-            continue
-        if norm(name) in ("жами", "итого", "total"): continue
-        records.append(rec)
-    wb.close()
-    if not records:
-        preview = "; ".join(str(x) for x in cols[:12])
-        raise ValueError("Не найдено ни одной строки кассира. Проверьте лист и строку шапки. Распознаны колонки: " + preview)
-    return {"records":records, "errors":errors, "header_rows":[top,sub], "columns":cols}
-
-def save_cashier_import(filename: str, parsed: Dict[str, Any]) -> Dict[str, Any]:
-    now=datetime.now(timezone.utc).isoformat()
-    with _connect() as c:
-        cur=c.execute("INSERT INTO cashier_imports(filename, imported_at, rows_count) VALUES(?,?,?)",(filename,now,len(parsed['records'])))
-        iid=cur.lastrowid
-        for r in parsed['records']:
-            c.execute("""INSERT INTO cashier_reports(import_id,tab_number,full_name,position,days_worked,operations_count,operations_minutes,bek_count,bek_minutes,front_count,front_minutes,metrics_json)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",(iid,r.get('tab_number'),r['full_name'],r.get('position'),r.get('days_worked',0),r.get('operations_count',0),r.get('operations_minutes',0),r.get('bek_count',0),r.get('bek_minutes',0),r.get('front_count',0),r.get('front_minutes',0),json.dumps(r['metrics'],ensure_ascii=False)))
-    return {"import_id":iid,"imported":len(parsed['records']),"header_rows":parsed['header_rows']}
-
-def _enrich_cashier(x: Dict[str, Any], include_metrics: bool = False) -> Dict[str, Any]:
-    x['avg_seconds_per_operation'] = round(x['operations_minutes'] * 60 / x['operations_count'], 1) if x['operations_count'] else 0
-    x['operations_per_day'] = round(x['operations_count'] / x['days_worked'], 1) if x['days_worked'] else 0
-    raw = json.loads(x.pop('metrics_json') or '{}')
-    if include_metrics:
-        x['metrics'] = sorted(({"name": n, "count": round(v.get('count', 0)), "minutes": round(v.get('minutes', 0))} for n, v in raw.items()), key=lambda z: z['count'], reverse=True)
-    return x, raw
-
-
-def cashier_analytics(import_id: int | None = None, page: int = 1, page_size: int = 25) -> Dict[str, Any]:
-    with _connect() as c:
-        if import_id is None:
-            x = c.execute("SELECT id FROM cashier_imports ORDER BY id DESC LIMIT 1").fetchone(); import_id = x['id'] if x else None
-        if not import_id: return {"summary": {}, "cashiers": [], "categories": [], "import": None, "page": 1, "total_pages": 1, "total": 0}
-        info = c.execute("SELECT * FROM cashier_imports WHERE id=?", (import_id,)).fetchone()
-        rows = [dict(x) for x in c.execute("SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC", (import_id,))]
-    total_ops = sum(x['operations_count'] for x in rows); total_min = sum(x['operations_minutes'] for x in rows)
-    cats = {}
-    for x in rows:
-        _, raw = _enrich_cashier(x)
-        for n, v in raw.items():
-            b = cats.setdefault(n, {'name': n, 'count': 0, 'minutes': 0}); b['count'] += v.get('count', 0); b['minutes'] += v.get('minutes', 0)
-    total = len(rows); page = max(1, page); page_size = max(1, min(page_size, 100)); start = (page - 1) * page_size
-    categories = sorted(cats.values(), key=lambda x: x['count'], reverse=True)
-    return {"import": dict(info), "summary": {"cashiers": total, "operations": round(total_ops), "minutes": round(total_min), "avg_seconds_per_operation": round(total_min*60/total_ops,1) if total_ops else 0, "bek_operations": round(sum(x['bek_count'] for x in rows)), "front_operations": round(sum(x['front_count'] for x in rows))}, "cashiers": rows[start:start+page_size], "categories": categories, "page": page, "page_size": page_size, "total": total, "total_pages": max(1, (total + page_size - 1)//page_size)}
-
-
-def cashier_detail(report_id: int) -> Dict[str, Any] | None:
-    with _connect() as c:
-        row = c.execute("SELECT r.*, i.filename, i.imported_at FROM cashier_reports r JOIN cashier_imports i ON i.id=r.import_id WHERE r.id=?", (report_id,)).fetchone()
-        if not row: return None
-        peers = c.execute("SELECT operations_count FROM cashier_reports WHERE import_id=?", (row['import_id'],)).fetchall()
-    item, _ = _enrich_cashier(dict(row), include_metrics=True)
-    values = sorted(float(p['operations_count']) for p in peers)
-    item['rank_by_operations'] = 1 + sum(v > item['operations_count'] for v in values)
-    item['percentile'] = round(100 * sum(v <= item['operations_count'] for v in values) / len(values), 1) if values else 0
-    return item
+def norm(v): return re.sub(r'[^a-zа-я0-9]+',' ',str(v or '').lower().replace('қ','к').replace('ў','у')).strip()
+def num(v):
+ try:return float(v or 0)
+ except: return float(re.sub(r'[^0-9,.-]','',str(v)).replace(',','.')) if re.sub(r'[^0-9,.-]','',str(v)) else 0
+# Exact business schema supplied by operations team. Excel column index is 1-based.
+SCHEMA=[
+ ('Номер сотрудника',1,'employee_number','text'),('Жами',2,'total_marker','text'),('ФИШ',3,'full_name','text'),('Табел',4,'tab_number','text'),('Ишлаган кун сони',5,'days_worked','number'),('Лавозим',6,'position','text'),
+ ('Жами амалиётлар',7,'operations_count','count'),('Жами амалиётлар',8,'operations_minutes','minutes'),('Юклама',9,'load_percent','percent'),('Юклама',10,'load_difference','difference'),('Жами (БЕК)',11,'bek_count','count'),('Жами (БЕК)',12,'bek_minutes','minutes'),
+ ('Амалга оширилган операциялар сони (кирим-чиқим)',13,'income_outcome_count','count'),('Амалга оширилган операциялар сони (кирим-чиқим)',14,'income_outcome_minutes','minutes'),('Банкоматга пул қўйиш',15,'atm_cash_count','count'),('Банкоматга пул қўйиш',16,'atm_cash_minutes','minutes'),('Касса мудири',17,'cash_manager_count','count'),('Касса мудири',18,'cash_manager_minutes','minutes'),('Кечки кассир',19,'evening_cashier_count','count'),('Кечки кассир',20,'evening_cashier_minutes','minutes'),('Назоратчи кассир ролини бажарганда',21,'controller_count','count'),('Назоратчи кассир ролини бажарганда',22,'controller_minutes','minutes'),('Купюра санаш',23,'cash_counting_count','count'),('Купюра санаш',24,'cash_counting_minutes','minutes'),('Жами (ФРОНТ)',25,'front_count','count'),('Жами (ФРОНТ)',26,'front_minutes','minutes'),
+ ('ВАЛЮТА 100$',27,'usd_100_count','count'),('ВАЛЮТА 100$',28,'usd_100_minutes','minutes'),('ВАЛЮТА 100,01–1000$',29,'usd_100_1000_count','count'),('ВАЛЮТА 100,01–1000$',30,'usd_100_1000_minutes','minutes'),('ВАЛЮТА 1000,01–5000$',31,'usd_1000_5000_count','count'),('ВАЛЮТА 1000,01–5000$',32,'usd_1000_5000_minutes','minutes'),('ВАЛЮТА 10000$',33,'usd_10000_count','count'),('ВАЛЮТА 10000$',34,'usd_10000_minutes','minutes'),('ВАЛЮТА 5000,01–10000$',35,'usd_5000_10000_count','count'),('ВАЛЮТА 5000,01–10000$',36,'usd_5000_10000_minutes','minutes'),('Кирим, чиқим ҳужжатини текшириш, расмийлаштириш',37,'docs_count','count'),('Кирим, чиқим ҳужжатини текшириш, расмийлаштириш',38,'docs_minutes','minutes'),('Коммунал тўловлар (кирим-чиқим)',39,'utilities_count','count'),('Коммунал тўловлар (кирим-чиқим)',40,'utilities_minutes','minutes'),('Пластик карта тарқатиш',41,'card_issue_count','count'),('Пластик карта тарқатиш',42,'card_issue_minutes','minutes'),('Пластикдан нақд пул ечиш',43,'card_cashout_count','count'),('Пластикдан нақд пул ечиш',44,'card_cashout_minutes','minutes'),('БЕК фарқ',45,'bek_difference_count','count'),('БЕК фарқ',46,'bek_difference_minutes','minutes'),('ФРОНТ фарқ',47,'front_difference_count','count'),('ФРОНТ фарқ',48,'front_difference_minutes','minutes')]
+CORE={'employee_number','total_marker','full_name','tab_number','days_worked','position','operations_count','operations_minutes','bek_count','bek_minutes','front_count','front_minutes'}
+def init_cashier_tables():
+ with _connect() as c:
+  c.execute("CREATE TABLE IF NOT EXISTS cashier_imports (id INTEGER PRIMARY KEY AUTOINCREMENT,filename TEXT,imported_at TEXT NOT NULL,rows_count INTEGER NOT NULL,report_label TEXT)")
+  c.execute("CREATE TABLE IF NOT EXISTS cashier_reports (id INTEGER PRIMARY KEY AUTOINCREMENT,import_id INTEGER NOT NULL REFERENCES cashier_imports(id) ON DELETE CASCADE,tab_number TEXT,full_name TEXT NOT NULL,position TEXT,days_worked REAL,operations_count REAL NOT NULL DEFAULT 0,operations_minutes REAL NOT NULL DEFAULT 0,bek_count REAL NOT NULL DEFAULT 0,bek_minutes REAL NOT NULL DEFAULT 0,front_count REAL NOT NULL DEFAULT 0,front_minutes REAL NOT NULL DEFAULT 0,metrics_json TEXT NOT NULL DEFAULT '{}')")
+def parse_cashiers_xlsx(path:str|Path):
+ wb=openpyxl.load_workbook(path,read_only=True,data_only=True);ws=wb.active
+ # Locate header by the real ФИШ cell; data always begins after the Сони/Минут row.
+ header=next((r for r in range(1,min(15,ws.max_row)+1) if any(norm(v) in ('фиш','фио') for v in next(ws.iter_rows(min_row=r,max_row=r,values_only=True)))),None)
+ if not header: raise ValueError('Не найдена обязательная колонка C «ФИШ». Ожидается отчёт Kassirlar bo‘yicha.')
+ data_start=header+2; records=[];errors=[]
+ for rn,row in enumerate(ws.iter_rows(min_row=data_start,values_only=True),data_start):
+  if not any(v not in (None,'') for v in row):continue
+  get=lambda col: row[col-1] if len(row)>=col else None
+  name=str(get(3) or '').strip()
+  # Skip filter/total/header lines; an employee row always has a numeric identifier in A.
+  if not name or norm(name) in ('жами','итого','total','фиш','фио') or not str(get(1) or '').strip().replace('.','',1).isdigit():continue
+  rec={'metrics':{}}
+  for title,col,key,kind in SCHEMA:
+   v=get(col)
+   if kind=='text':rec[key]=str(v).strip() if v is not None else ''
+   else:
+    value=num(v)
+    if key in CORE or key in ('load_percent','load_difference'):rec[key]=value
+    else:
+     m=rec['metrics'].setdefault(title,{}) ;m[kind]=value
+  records.append(rec)
+ wb.close()
+ if not records:raise ValueError(f'После строки шапки {header} не найдено строк с ФИШ в колонке C.')
+ return {'records':records,'errors':errors,'header_rows':[header,header+1],'columns':[f'{chr(65+(c-1)%26) if c<=26 else chr(64+(c-1)//26)+chr(65+(c-1)%26)}: {t}' for t,c,_,_ in SCHEMA]}
+def save_cashier_import(filename,parsed):
+ with _connect() as c:
+  iid=c.execute('INSERT INTO cashier_imports(filename,imported_at,rows_count) VALUES(?,?,?)',(filename,datetime.now(timezone.utc).isoformat(),len(parsed['records']))).lastrowid
+  for r in parsed['records']:c.execute('INSERT INTO cashier_reports(import_id,tab_number,full_name,position,days_worked,operations_count,operations_minutes,bek_count,bek_minutes,front_count,front_minutes,metrics_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(iid,r.get('tab_number'),r['full_name'],r.get('position'),r.get('days_worked',0),r.get('operations_count',0),r.get('operations_minutes',0),r.get('bek_count',0),r.get('bek_minutes',0),r.get('front_count',0),r.get('front_minutes',0),json.dumps({'employee_number':r.get('employee_number'),'total_marker':r.get('total_marker'),'load_percent':r.get('load_percent',0),'load_difference':r.get('load_difference',0),'operations':r['metrics']},ensure_ascii=False)))
+ return {'import_id':iid,'imported':len(parsed['records']),'header_rows':parsed['header_rows']}
+def _enrich(x,detail=False):
+ x['avg_seconds_per_operation']=round(x['operations_minutes']*60/x['operations_count'],1) if x['operations_count'] else 0;x['operations_per_day']=round(x['operations_count']/x['days_worked'],1) if x['days_worked'] else 0
+ raw=json.loads(x.pop('metrics_json') or '{}'); ops=raw.get('operations',{})
+ if detail:x['employee_number']=raw.get('employee_number');x['load_percent']=raw.get('load_percent',0);x['load_difference']=raw.get('load_difference',0);x['metrics']=[{'name':n,**v} for n,v in ops.items()]
+ return x,ops
+def cashier_analytics(import_id=None,page=1,page_size=25):
+ with _connect() as c:
+  if import_id is None:
+   q=c.execute('SELECT id FROM cashier_imports ORDER BY id DESC LIMIT 1').fetchone();import_id=q['id'] if q else None
+  if not import_id:return {'summary':{},'cashiers':[],'categories':[],'import':None,'page':1,'total_pages':1,'total':0}
+  info=dict(c.execute('SELECT * FROM cashier_imports WHERE id=?',(import_id,)).fetchone());rows=[dict(z) for z in c.execute('SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC',(import_id,))]
+ cats={}
+ for x in rows:
+  _,ops=_enrich(x)
+  for n,v in ops.items():
+   a=cats.setdefault(n,{'name':n,'count':0,'minutes':0});a['count']+=v.get('count',0);a['minutes']+=v.get('minutes',0)
+ total=len(rows);page=max(1,page);page_size=min(max(1,page_size),100);start=(page-1)*page_size
+ return {'import':info,'summary':{'cashiers':total,'operations':round(sum(x['operations_count'] for x in rows)),'minutes':round(sum(x['operations_minutes'] for x in rows)),'avg_seconds_per_operation':round(sum(x['operations_minutes'] for x in rows)*60/sum(x['operations_count'] for x in rows),1) if sum(x['operations_count'] for x in rows) else 0,'bek_operations':round(sum(x['bek_count'] for x in rows)),'front_operations':round(sum(x['front_count'] for x in rows))},'cashiers':rows[start:start+page_size],'categories':sorted(cats.values(),key=lambda x:x['count'],reverse=True),'page':page,'page_size':page_size,'total':total,'total_pages':max(1,(total+page_size-1)//page_size)}
+def cashier_detail(report_id):
+ with _connect() as c:
+  r=c.execute('SELECT r.*,i.filename,i.imported_at FROM cashier_reports r JOIN cashier_imports i ON i.id=r.import_id WHERE r.id=?',(report_id,)).fetchone()
+  if not r:return None
+  peers=c.execute('SELECT operations_count FROM cashier_reports WHERE import_id=?',(r['import_id'],)).fetchall()
+ x,_=_enrich(dict(r),True);x['rank_by_operations']=1+sum(p['operations_count']>x['operations_count'] for p in peers);x['percentile']=round(100*sum(p['operations_count']<=x['operations_count'] for p in peers)/len(peers),1);return x
