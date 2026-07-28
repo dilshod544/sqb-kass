@@ -536,8 +536,10 @@ async def get_cashier_analytics(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     role: Optional[str] = Query(None, pattern="^(back|front|universal)$"),
+    search: Optional[str] = Query(None, description="Поиск по ФИО, должности, табелю, номеру"),
+    position: Optional[str] = Query(None, description="Фильтр по должности"),
 ):
-    return cashier_analytics(import_id, page, page_size, role)
+    return cashier_analytics(import_id, page, page_size, role, search, position)
 
 
 @app.get("/api/cashiers/{report_id}", summary="Углублённая аналитика одного кассира")

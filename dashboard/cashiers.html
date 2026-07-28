@@ -1,25 +1,686 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Аналитика кассиров</title><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="https://unpkg.com/lucide@latest"></script><style>
-*{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#152238;font:14px Inter,Arial,sans-serif}header{height:62px;background:#fff;display:flex;align-items:center;padding:0 28px;gap:12px;border-bottom:1px solid #e4eaf2}h1{font-size:19px;margin:0}.home{margin-left:auto;color:#3569c8;text-decoration:none;font-weight:700}.wrap{max-width:1400px;margin:25px auto;padding:0 20px}.hero,.card{background:white;border:1px solid #e2e9f2;border-radius:18px;box-shadow:0 5px 17px #2030500d}.hero{padding:22px;display:flex;gap:25px;align-items:center}.hero h2{margin:0 0 8px;font-size:25px}.hero p{color:#637187;margin:0;line-height:1.5}.upload{margin-left:auto;min-width:300px;padding:15px;border:1px dashed #6c9df0;border-radius:13px;background:#f5f8ff}.upload input{max-width:100%;margin:8px 0}.btn{background:#2864ce;border:0;color:#fff;border-radius:9px;padding:9px 14px;font-weight:bold;cursor:pointer}.notice{margin:15px 0;color:#54657b}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin:18px 0}.kpi{padding:16px}.label{font-size:11px;text-transform:uppercase;color:#718096;font-weight:bold}.val{font-size:26px;font-weight:800;margin-top:9px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{padding:18px}.card h3{margin:0 0 14px;font-size:15px}.chart{height:310px}.tableCard{margin-top:16px;overflow:auto}table{border-collapse:collapse;width:100%;min-width:800px}th,td{padding:11px;border-bottom:1px solid #eef2f6;text-align:left}th{font-size:11px;text-transform:uppercase;color:#77859a}tr:hover{background:#f8fbff}.muted{color:#6d7a8d}@media(max-width:850px){.hero{display:block}.upload{margin-top:15px}.kpis{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
-</style></head><body><header><i data-lucide="users-round"></i><h1>Cashier Intelligence</h1><a class="home" href="/dashboard/index.html">← Главная</a></header><main class="wrap"><section class="hero"><div><h2>Аналитика работы кассиров</h2><p>Загрузите Excel-отчёт в формате «Kassirlar bo‘yicha». Сервис распознаёт двухуровневую шапку, считает KPI, рейтинг производительности и структуру операций.</p></div><div class="upload"><b>Новый отчёт кассиров</b><br><a href="/dashboard/import-cashiers.html" class="btn" style="display:inline-block;text-decoration:none;margin-top:10px">Открыть импорт →</a></div></section><div class="notice" id="notice">Загрузка последних данных…</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0"><button class="btn role active" data-role="" onclick="setRole('')">Все кассиры</button><button class="btn role" data-role="back" onclick="setRole('back')">БЭК-кассиры</button><button class="btn role" data-role="front" onclick="setRole('front')">ФРОНТ-кассиры</button><button class="btn role" data-role="universal" onclick="setRole('universal')">Универсальные</button></div><section class="kpis"><div class="card kpi"><div class="label">Кассиров</div><div class="val" id="k-cash">—</div></div><div class="card kpi"><div class="label">Операций</div><div class="val" id="k-ops">—</div></div><div class="card kpi"><div class="label">Рабочих минут</div><div class="val" id="k-min">—</div></div><div class="card kpi"><div class="label">Среднее на операцию</div><div class="val" id="k-speed">—</div></div><div class="card kpi"><div class="label">БЕК / ФРОНТ</div><div class="val" id="k-bf">—</div></div></section><section class="grid"><div class="card"><h3>Топ кассиров по числу операций</h3><div class="chart"><canvas id="top"></canvas></div></div><div class="card"><h3>Структура операций</h3><div class="chart"><canvas id="cats"></canvas></div></div></section><section class="card tableCard"><h3>Рейтинг и эффективность</h3><table><thead><tr><th>Кассир</th><th>Табель</th><th>Должность</th><th>Дней</th><th>Операций</th><th>Опер./день</th><th>Минут</th><th>Сек./операцию</th><th>БЕК</th><th>ФРОНТ</th></tr></thead><tbody id="rows"></tbody></table><div style="display:flex;justify-content:space-between;align-items:center;padding:14px"><button class="btn" id="prev" onclick="go(-1)">← Назад</button><span class="muted" id="pager">Страница —</span><button class="btn" id="next" onclick="go(1)">Вперёд →</button></div></section></main><script>
-const base=`${location.protocol}//${location.hostname}:8000`;let charts=[], currentPage=1, totalPages=1, selectedRole='';const nf=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0});
-function destroy(){charts.forEach(x=>x.destroy());charts=[]}function draw(id,type,labels,data,label){charts.push(new Chart(document.getElementById(id),{type,data:{labels,datasets:[{label,data,backgroundColor:['#2864ce','#4e8aec','#11a879','#f2aa37','#8b5cf6','#e95c73','#38bdf8','#94a3b8'],borderRadius:7}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='doughnut'}}}}))}
-async function load(){try{let r=await fetch(base+`/api/cashiers/analytics?page=${currentPage}&page_size=25&role=${selectedRole}`);let d=await r.json(),s=d.summary||{};if(!d.import){document.getElementById('notice').textContent='Нет загруженных отчётов. Выберите XLSX выше.';return}document.getElementById('notice').textContent=`Отчёт: ${d.import.filename} · импортирован ${new Date(d.import.imported_at).toLocaleString('ru-RU')}`;document.getElementById('k-cash').textContent=s.cashiers;document.getElementById('k-ops').textContent=nf.format(s.operations);document.getElementById('k-min').textContent=nf.format(s.minutes);document.getElementById('k-speed').textContent=s.avg_seconds_per_operation+' сек';document.getElementById('k-bf').textContent=nf.format(s.bek_operations)+' / '+nf.format(s.front_operations);destroy();let top=d.cashiers.slice(0,10);draw('top','bar',top.map(x=>x.full_name.split(' ').slice(0,2).join(' ')),top.map(x=>x.operations_count),'Операций');let c=d.categories.slice(0,8);draw('cats','doughnut',c.map(x=>x.name),c.map(x=>x.count),'Операций');currentPage=d.page||1;totalPages=d.total_pages||1;document.getElementById('pager').textContent=`Страница ${currentPage} из ${totalPages} · ${d.total||0} кассиров`;document.getElementById('prev').disabled=currentPage<=1;document.getElementById('next').disabled=currentPage>=totalPages;document.getElementById('rows').innerHTML=d.cashiers.map(x=>`<tr style="cursor:pointer" onclick="location.href='/dashboard/cashier-detail.html?id=${x.id}'" title="Открыть подробную аналитику"><td><b>${x.full_name}</b><br><span class="muted">${x.cashier_type==='back'?'БЭК':x.cashier_type==='front'?'ФРОНТ':x.cashier_type==='universal'?'Универсальный':'Не определён'} · Подробнее →</span></td><td>${x.tab_number||'—'}</td><td>${x.position||'—'}</td><td>${nf.format(x.days_worked)}</td><td><b>${nf.format(x.operations_count)}</b></td><td>${nf.format(x.operations_per_day)}</td><td>${nf.format(x.operations_minutes)}</td><td>${x.avg_seconds_per_operation}</td><td>${nf.format(x.bek_count)}</td><td>${nf.format(x.front_count)}</td></tr>`).join('')}catch(e){document.getElementById('notice').textContent='Не удалось получить данные: '+e.message}}
-function setRole(role){selectedRole=role;currentPage=1;document.querySelectorAll('.role').forEach(b=>b.style.opacity=b.dataset.role===role?'1':'.55');load()}
-function go(delta){let next=currentPage+delta;if(next>=1&&next<=totalPages){currentPage=next;load();window.scrollTo({top:0,behavior:'smooth'})}}
-async function upload(){
-  const f=document.getElementById('file').files[0];
-  const notice=document.getElementById('notice');
-  if(!f){notice.textContent='Выберите Excel-файл .xlsx';return}
-  if(!f.name.toLowerCase().endsWith('.xlsx')){notice.textContent='Неверный формат: нужен файл .xlsx, получен '+f.name;return}
-  try{
-    let fd=new FormData();fd.append('file',f);notice.textContent='Импортируем «'+f.name+'»…';
-    const r=await fetch(base+'/api/cashiers/import',{method:'POST',body:fd});
-    let d;try{d=await r.json()}catch(_){throw new Error('Сервер вернул невалидный ответ ('+r.status+')')}
-    if(!r.ok)throw new Error(d.detail||'Ошибка сервера '+r.status);
-    const warnings=d.validation_errors_count?` Пропущено строк: ${d.validation_errors_count}.` : '';
-    currentPage=1;await load();
-    notice.innerHTML=`<b style="color:#16834e">Импорт завершён:</b> ${d.imported} кассиров.${warnings}<br><span class="muted">Шапка: строки ${d.header_rows.join(' и ')}. Распознано полей: ${d.columns_detected.length}.</span>`;
-  }catch(e){notice.innerHTML=`<b style="color:#c93434">Импорт не выполнен.</b> ${e.message}<br><span class="muted">Проверьте: файл не открыт в Excel, это .xlsx, в нём есть столбец «ФИШ» и строки кассиров.</span>`;console.error(e)}
-}
-lucide.createIcons();load();
-</script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Аналитика кассиров</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f4f7fb;
+      color: #152238;
+      font: 14px Inter, Arial, sans-serif;
+    }
+    header {
+      height: 62px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      gap: 12px;
+      border-bottom: 1px solid #e4eaf2;
+    }
+    h1 { font-size: 19px; margin: 0; }
+    .home {
+      margin-left: auto;
+      color: #3569c8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .wrap {
+      max-width: 1400px;
+      margin: 25px auto;
+      padding: 0 20px;
+    }
+    .hero, .card {
+      background: white;
+      border: 1px solid #e2e9f2;
+      border-radius: 18px;
+      box-shadow: 0 5px 17px #2030500d;
+    }
+    .hero {
+      padding: 22px;
+      display: flex;
+      gap: 25px;
+      align-items: center;
+    }
+    .hero h2 { margin: 0 0 8px; font-size: 25px; }
+    .hero p { color: #637187; margin: 0; line-height: 1.5; }
+    .upload {
+      margin-left: auto;
+      min-width: 300px;
+      padding: 15px;
+      border: 1px dashed #6c9df0;
+      border-radius: 13px;
+      background: #f5f8ff;
+    }
+    .btn {
+      background: #2864ce;
+      border: 0;
+      color: #fff;
+      border-radius: 9px;
+      padding: 9px 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn:disabled {
+      opacity: 0.4!important;
+      cursor: not-allowed!important;
+    }
+    .btn.role {
+      background: #edf3fc;
+      color: #2864ce;
+      border: 1px solid #d0e0f8;
+    }
+    .btn.role.active {
+      background: #2864ce;
+      color: #fff;
+      border-color: #2864ce;
+      box-shadow: 0 4px 12px #2864ce35;
+    }
+    .notice { margin: 15px 0; color: #54657b; }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 13px;
+      margin: 18px 0;
+    }
+    .kpi { padding: 16px; }
+    .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #718096;
+      font-weight: bold;
+    }
+    .val {
+      font-size: 26px;
+      font-weight: 800;
+      margin-top: 9px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .card { padding: 18px; }
+    .card h3 { margin: 0 0 14px; font-size: 15px; }
+    .chart { height: 310px; }
+    .tableCard { margin-top: 16px; overflow: auto; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 800px;
+    }
+    th, td {
+      padding: 11px;
+      border-bottom: 1px solid #eef2f6;
+      text-align: left;
+    }
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #77859a;
+    }
+    tr:hover { background: #f8fbff; }
+    .muted { color: #6d7a8d; }
+    
+    .search-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: 1px solid #e2e9f2;
+      box-shadow: 0 3px 10px #00000008;
+    }
+    .search-bar input {
+      flex: 1;
+      border: 0;
+      outline: 0;
+      font-size: 14px;
+      padding: 6px;
+      background: transparent;
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15,23,42,0.55);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card {
+      background: #fff;
+      width: min(900px, 100%);
+      max-height: 90vh;
+      overflow-y: auto;
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      padding: 26px;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 22px;
+      background: #f1f5f9;
+      border: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-close:hover { background: #e2e8f0; color: #0f172a; }
+    .modal-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .modal-kpi {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .badge-role {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .badge-front { background: #e0f2fe; color: #0369a1; }
+    .badge-back { background: #fef3c7; color: #b45309; }
+    .badge-universal { background: #dcfce7; color: #15803d; }
+    
+    @media(max-width:850px) {
+      .hero { display: block; }
+      .upload { margin-top: 15px; }
+      .kpis, .modal-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <i data-lucide="users-round"></i>
+    <h1>Cashier Intelligence</h1>
+    <a class="home" href="/dashboard/index.html">← Главная</a>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <h2>Аналитика работы кассиров</h2>
+        <p>Загрузите Excel-отчёт в формате «Kassirlar bo‘yicha». Сервис распознаёт двухуровневую шапку, считает KPI, рейтинг производительности и структуру операций.</p>
+      </div>
+      <div class="upload">
+        <b>Новый отчёт кассиров</b><br>
+        <a href="/dashboard/import-cashiers.html" class="btn" style="display:inline-block;text-decoration:none;margin-top:10px">Открыть импорт →</a>
+      </div>
+    </section>
+
+    <div class="notice" id="notice">Загрузка последних данных…</div>
+
+    <div class="search-bar">
+      <i data-lucide="search" style="color:#64748b;width:18px;height:18px"></i>
+      <input type="text" id="search-input" placeholder="Поиск кассира по ФИО, должности, табелю или номеру сотрудника…" oninput="onSearchInput()">
+      <select id="position-select" onchange="onPositionSelect()" style="border:1px solid #cbd5e1;padding:6px 12px;border-radius:10px;outline:0;font-size:13px;background:#fff;color:#1e293b;cursor:pointer">
+        <option value="">Все должности</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0">
+      <button class="btn role active" data-role="" onclick="setRole('')">Все кассиры</button>
+      <button class="btn role" data-role="back" onclick="setRole('back')">БЭК-кассиры</button>
+      <button class="btn role" data-role="front" onclick="setRole('front')">ФРОНТ-кассиры</button>
+      <button class="btn role" data-role="universal" onclick="setRole('universal')">Универсальные</button>
+    </div>
+
+    <section class="kpis">
+      <div class="card kpi">
+        <div class="label" id="lbl-cash">Кассиров</div>
+        <div class="val" id="k-cash">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Операций</div>
+        <div class="val" id="k-ops">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Рабочих минут (часов)</div>
+        <div class="val" id="k-min">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Среднее на операцию</div>
+        <div class="val" id="k-speed">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">БЭК / ФРОНТ</div>
+        <div class="val" id="k-bf">—</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+          <h3 id="chart-top-title" style="margin:0">Топ 10 кассиров</h3>
+          <div id="pos-top-tabs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        </div>
+        <div class="chart"><canvas id="top"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3 id="chart-cats-title">Структура операций (%)</h3>
+        <div class="chart"><canvas id="cats"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card tableCard">
+      <h3>Рейтинг и эффективность</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Кассир</th>
+            <th>Табель</th>
+            <th>Должность</th>
+            <th>Дней</th>
+            <th>Операций</th>
+            <th>Опер./день</th>
+            <th>Минут</th>
+            <th>Сек./операцию</th>
+            <th>БЭК</th>
+            <th>ФРОНТ</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px">
+        <button class="btn" id="prev" onclick="go(-1)">← Назад</button>
+        <span class="muted" id="pager">Страница —</span>
+        <button class="btn" id="next" onclick="go(1)">Вперёд →</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Cashier Detail Modal -->
+  <div class="modal-overlay" id="detail-modal" onclick="closeModalOnOverlay(event)">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span id="m-role-badge" class="badge-role badge-universal">Универсальный</span>
+        <span class="muted" id="m-meta">№ сотрудника: — · Табель: —</span>
+      </div>
+      <h2 id="m-name" style="margin:8px 0 4px;font-size:24px">—</h2>
+      <div id="m-pos" style="color:#475569;font-weight:600">—</div>
+
+      <div class="modal-kpi-grid">
+        <div class="modal-kpi">
+          <div class="label">Рабочее время</div>
+          <div id="m-hours" class="val" style="font-size:20px">—</div>
+          <small id="m-mins-sub" class="muted">—</small>
+        </div>
+        <div class="modal-kpi">
+          <div class="label">Рабочих дней (из 22)</div>
+          <div id="m-days" class="val" style="font-size:20px">—</div>
+          <small id="m-days-sub" class="muted">—</small>
+        </div>
+        <div class="modal-kpi">
+          <div class="label">Всего операций</div>
+          <div id="m-ops" class="val" style="font-size:20px">—</div>
+          <small id="m-perday-sub" class="muted">—</small>
+        </div>
+        <div class="modal-kpi">
+          <div class="label">Главное направление</div>
+          <div id="m-top-dir" class="val" style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+          <small class="muted">Макс. доля</small>
+        </div>
+      </div>
+
+      <div style="margin-top:20px">
+        <h3 style="margin:0 0 12px">Распределение операций (%)</h3>
+        <div style="height:260px"><canvas id="modal-chart"></canvas></div>
+      </div>
+
+      <div style="margin-top:20px">
+        <h3 style="margin:0 0 12px">Подробные показатели по операциям</h3>
+        <table style="width:100%">
+          <thead>
+            <tr>
+              <th>Операция</th>
+              <th>Раздел</th>
+              <th>Количество</th>
+              <th>Доля (%)</th>
+              <th>Минут</th>
+            </tr>
+          </thead>
+          <tbody id="m-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const base = location.origin.includes(':') ? location.origin : `${location.protocol}//${location.hostname}:8000`;
+    let charts = [], modalChart = null, currentPage = 1, totalPages = 1, selectedRole = '', selectedPosition = '', searchQuery = '', searchTimeout = null, globalTopByPosition = {};
+    const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+
+    function destroy() {
+      charts.forEach(x => x.destroy());
+      charts = [];
+    }
+
+    function onSearchInput() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchQuery = document.getElementById('search-input').value.trim();
+        currentPage = 1;
+        load();
+      }, 300);
+    }
+
+    function onPositionSelect() {
+      selectedPosition = document.getElementById('position-select').value;
+      currentPage = 1;
+      load();
+    }
+
+    function drawTop(labels, data) {
+      const ctx = document.getElementById('top');
+      if (!ctx) return;
+      const topChart = charts.find(c => c.canvas.id === 'top');
+      if (topChart) {
+        topChart.destroy();
+        charts = charts.filter(c => c.canvas.id !== 'top');
+      }
+      charts.push(new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Операций',
+            data: data,
+            backgroundColor: '#2864ce',
+            borderRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      }));
+    }
+
+    function drawCats(categories) {
+      const ctx = document.getElementById('cats');
+      if (!ctx) return;
+      const catChart = charts.find(c => c.canvas.id === 'cats');
+      if (catChart) {
+        catChart.destroy();
+        charts = charts.filter(c => c.canvas.id !== 'cats');
+      }
+      const labels = categories.map(x => `${x.name} (${x.pct}%)`);
+      const data = categories.map(x => x.count);
+      const colors = ['#2864ce','#4e8aec','#11a879','#f2aa37','#8b5cf6','#e95c73','#38bdf8','#94a3b8'];
+      charts.push(new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: colors.slice(0, categories.length)
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, position: 'right', labels: { font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: function(item) {
+                  const cat = categories[item.dataIndex];
+                  return ` ${cat.name}: ${nf.format(cat.count)} опер. (${cat.pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      }));
+    }
+
+    function renderPosTopTabs(topByPosition) {
+      globalTopByPosition = topByPosition || {};
+      const container = document.getElementById('pos-top-tabs');
+      if (!container) return;
+      
+      const positions = Object.keys(globalTopByPosition);
+      if (!positions.length) { container.innerHTML = ''; return; }
+
+      let html = `<button class="btn" style="padding:4px 8px;font-size:11px;background:#2864ce" onclick="switchPosTop('')">Все</button>`;
+      positions.slice(0, 4).forEach(pos => {
+        html += `<button class="btn" style="padding:4px 8px;font-size:11px;background:#e2e8f0;color:#334155" onclick="switchPosTop('${pos.replace(/'/g, "\\'")}')">${pos}</button>`;
+      });
+      container.innerHTML = html;
+    }
+
+    function switchPosTop(posName) {
+      const container = document.getElementById('pos-top-tabs');
+      if (container) {
+        container.querySelectorAll('button').forEach(b => {
+          if ((b.textContent === 'Все' && !posName) || b.textContent === posName) {
+            b.style.background = '#2864ce'; b.style.color = '#fff';
+          } else {
+            b.style.background = '#e2e8f0'; b.style.color = '#334155';
+          }
+        });
+      }
+
+      let list = [];
+      if (!posName) {
+        list = window.currentCashiersList || [];
+      } else {
+        list = globalTopByPosition[posName] || [];
+      }
+      const top10 = list.slice(0, 10);
+      drawTop(top10.map(x => (x.full_name || '').split(' ').slice(0, 2).join(' ')), top10.map(x => x.operations_count));
+    }
+
+    function updatePositionSelectOptions(positions) {
+      const sel = document.getElementById('position-select');
+      if (!sel || sel.options.length > 1) return;
+      positions.forEach(pos => {
+        const opt = document.createElement('option');
+        opt.value = pos;
+        opt.textContent = pos;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function load() {
+      try {
+        let url = base + `/api/cashiers/analytics?page=${currentPage}&page_size=25&role=${selectedRole}`;
+        if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+        if (selectedPosition) url += `&position=${encodeURIComponent(selectedPosition)}`;
+
+        let r = await fetch(url);
+        let d = await r.json(), s = d.summary || {};
+        if (!d.import) {
+          document.getElementById('notice').textContent = 'Нет загруженных отчётов. Выберите XLSX выше.';
+          return;
+        }
+
+        if (d.positions) updatePositionSelectOptions(d.positions);
+        renderPosTopTabs(d.top_by_position);
+
+        window.currentCashiersList = d.cashiers;
+
+        const filterLabel = selectedRole === 'back' ? ' (БЭК)' : selectedRole === 'front' ? ' (ФРОНТ)' : selectedRole === 'universal' ? ' (Универсальные)' : '';
+        const posLabel = selectedPosition ? ` · ${selectedPosition}` : '';
+        document.getElementById('notice').textContent = `Отчёт: ${d.import.filename} · импортирован ${new Date(d.import.imported_at).toLocaleString('ru-RU')}${filterLabel}${posLabel}`;
+        
+        document.getElementById('lbl-cash').textContent = selectedRole ? `Кассиров${filterLabel}` : 'Кассиров';
+        document.getElementById('k-cash').textContent = s.cashiers;
+        document.getElementById('k-ops').textContent = nf.format(s.operations);
+        document.getElementById('k-min').textContent = `${nf.format(s.minutes)} (${s.hours || 0} ч)`;
+        document.getElementById('k-speed').textContent = s.avg_seconds_per_operation + ' сек';
+        document.getElementById('k-bf').textContent = nf.format(s.bek_operations) + ' / ' + nf.format(s.front_operations);
+
+        document.getElementById('chart-top-title').textContent = `Топ 10 кассиров${posLabel}`;
+        document.getElementById('chart-cats-title').textContent = `Структура операций (%) ${filterLabel}`;
+
+        let top = d.cashiers.slice(0, 10);
+        drawTop(top.map(x => (x.full_name || '').split(' ').slice(0, 2).join(' ')), top.map(x => x.operations_count));
+
+        let c = d.categories.slice(0, 8);
+        drawCats(c);
+
+        currentPage = d.page || 1;
+        totalPages = d.total_pages || 1;
+        document.getElementById('pager').textContent = `Страница ${currentPage} из ${totalPages} · ${d.total || 0} кассиров`;
+        document.getElementById('prev').disabled = currentPage <= 1;
+        document.getElementById('next').disabled = currentPage >= totalPages;
+
+        document.getElementById('rows').innerHTML = d.cashiers.map(x => `
+          <tr style="cursor:pointer" onclick="openCashierModal(${x.id})" title="Открыть аналитику кассира">
+            <td><b>${x.full_name}</b><br><span class="muted">${x.cashier_type === 'back' ? 'БЭК' : x.cashier_type === 'front' ? 'ФРОНТ' : x.cashier_type === 'universal' ? 'Универсальный' : 'Не определён'} · Нажать для анализа →</span></td>
+            <td>${x.tab_number || '—'}</td>
+            <td>${x.position || '—'}</td>
+            <td>${nf.format(x.days_worked)}</td>
+            <td><b>${nf.format(x.operations_count)}</b></td>
+            <td>${nf.format(x.operations_per_day)}</td>
+            <td>${nf.format(x.operations_minutes)}</td>
+            <td>${x.avg_seconds_per_operation}</td>
+            <td>${nf.format(x.bek_count)}</td>
+            <td>${nf.format(x.front_count)}</td>
+          </tr>
+        `).join('');
+      } catch(e) {
+        document.getElementById('notice').textContent = 'Не удалось получить данные: ' + e.message;
+      }
+    }
+
+    async function openCashierModal(reportId) {
+      try {
+        const r = await fetch(base + '/api/cashiers/' + reportId);
+        if (!r.ok) throw new Error('Не удалось загрузить данные кассира');
+        const x = await r.json();
+
+        document.getElementById('m-name').textContent = x.full_name;
+        document.getElementById('m-pos').textContent = x.position || 'Должность не указана';
+        document.getElementById('m-meta').textContent = `№ сотрудника: ${x.employee_number || '—'} · Табель: ${x.tab_number || '—'}`;
+        
+        const badge = document.getElementById('m-role-badge');
+        if (x.cashier_type === 'front') {
+          badge.className = 'badge-role badge-front'; badge.textContent = 'ФРОНТ-кассир';
+        } else if (x.cashier_type === 'back') {
+          badge.className = 'badge-role badge-back'; badge.textContent = 'БЭК-кассир';
+        } else {
+          badge.className = 'badge-role badge-universal'; badge.textContent = 'Универсальный';
+        }
+
+        document.getElementById('m-hours').textContent = x.hours_str ? x.hours_str.replace('soat', 'ч').replace('min', 'мин') : (nf.format(x.operations_minutes) + ' мин');
+        document.getElementById('m-mins-sub').textContent = `${nf.format(x.operations_minutes)} рабочих минут`;
+        document.getElementById('m-days').textContent = `${x.days_worked || 0} дн.`;
+        document.getElementById('m-days-sub').textContent = `${x.days_worked_pct || 0}% от нормы (22 дн)`;
+        document.getElementById('m-ops').textContent = nf.format(x.operations_count);
+        document.getElementById('m-perday-sub').textContent = `${x.operations_per_day || 0} опер/день`;
+        document.getElementById('m-top-dir').textContent = x.top_direction || '—';
+
+        const metrics = x.metrics || [];
+        document.getElementById('m-table-body').innerHTML = metrics.map(m => `
+          <tr>
+            <td><b>${m.name}</b></td>
+            <td><span class="muted">${m.section}</span></td>
+            <td><b>${nf.format(m.count)}</b></td>
+            <td><b style="color:#2864ce">${m.pct}%</b></td>
+            <td>${nf.format(m.minutes)} мин</td>
+          </tr>
+        `).join('') || '<tr><td colspan="5">Операции отсутствуют</td></tr>';
+
+        if (modalChart) modalChart.destroy();
+        const topMetrics = metrics.slice(0, 8);
+        const ctx = document.getElementById('modal-chart').getContext('2d');
+        modalChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: topMetrics.map(m => m.name),
+            datasets: [{
+              label: 'Доля (%)',
+              data: topMetrics.map(m => m.pct),
+              backgroundColor: '#2864ce',
+              borderRadius: 6
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => ` Доля: ${ctx.parsed.x}% (${nf.format(topMetrics[ctx.dataIndex].count)} опер.)`
+                }
+              }
+            },
+            scales: {
+              x: { max: 100, ticks: { callback: v => v + '%' } }
+            }
+          }
+        });
+
+        document.getElementById('detail-modal').classList.add('active');
+      } catch(e) {
+        alert(e.message);
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('detail-modal').classList.remove('active');
+    }
+
+    function closeModalOnOverlay(e) {
+      if (e.target.id === 'detail-modal') closeModal();
+    }
+
+    function setRole(role) {
+      selectedRole = role;
+      currentPage = 1;
+      document.querySelectorAll('.role').forEach(b => {
+        b.classList.toggle('active', (b.dataset.role || '') === role);
+      });
+      load();
+    }
+
+    function go(delta) {
+      let next = currentPage + delta;
+      if (next >= 1 && next <= totalPages) {
+        currentPage = next;
+        load();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    lucide.createIcons();
+    load();
+  </script>
+</body>
+</html>

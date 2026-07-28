@@ -1,1 +1,212 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Профиль кассира</title><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>body{margin:0;background:#f5f7fb;color:#162238;font:14px Inter,Arial,sans-serif}header{height:60px;background:#fff;border-bottom:1px solid #e4eaf2;display:flex;align-items:center;padding:0 28px}a{color:#2864ce;text-decoration:none;font-weight:700}.wrap{max-width:1180px;margin:25px auto;padding:0 20px}.hero,.card{background:#fff;border:1px solid #e2e9f2;border-radius:18px;padding:20px;box-shadow:0 5px 17px #2030500d}.hero h1{margin:6px 0;font-size:29px}.muted{color:#6f7d90}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:16px 0}.label{font-size:11px;text-transform:uppercase;color:#748198;font-weight:bold}.val{font-size:25px;font-weight:800;margin-top:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.chart{height:340px}table{border-collapse:collapse;width:100%}th,td{padding:11px;border-bottom:1px solid #edf1f6;text-align:left}th{font-size:11px;text-transform:uppercase;color:#748198}@media(max-width:700px){.kpis,.grid{grid-template-columns:1fr}}</style></head><body><header><a href="/dashboard/cashiers.html">← Все кассиры</a></header><main class="wrap"><section class="hero"><div class="muted" id="meta">Загрузка профиля…</div><h1 id="name">—</h1><div id="sub" class="muted"></div></section><section class="kpis"><div class="card"><div class="label">Место в рейтинге</div><div id="rank" class="val">—</div></div><div class="card"><div class="label">Операций</div><div id="ops" class="val">—</div></div><div class="card"><div class="label">Операций в день</div><div id="perday" class="val">—</div></div><div class="card"><div class="label">Скорость</div><div id="speed" class="val">—</div></div></section><section class="grid"><div class="card"><h3>Профиль операций</h3><div class="chart"><canvas id="chart"></canvas></div></div><div class="card"><h3>Ключевые показатели</h3><table id="core"></table></div></section><section class="card" style="margin-top:16px"><h3>Все операции кассира</h3><table><thead><tr><th>Операция</th><th>Количество</th><th>Минут</th></tr></thead><tbody id="metrics"></tbody></table></section></main><script>const id=new URLSearchParams(location.search).get('id'),base=`${location.protocol}//${location.hostname}:8000`,nf=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0});fetch(base+'/api/cashiers/'+id).then(r=>{if(!r.ok)throw Error('Профиль не найден');return r.json()}).then(x=>{document.title=x.full_name+' — аналитика';name.textContent=x.full_name;meta.textContent='Углублённая аналитика кассира · '+x.filename;sub.textContent=`№ сотрудника: ${x.employee_number||'—'} · Табель: ${x.tab_number||'—'} · ${x.position||'—'} · рабочих дней: ${x.days_worked||0} · Нагрузка: ${x.load_percent||0}% · Разница: ${x.load_difference||0}`;rank.textContent='#'+x.rank_by_operations+' / '+Math.round(x.percentile)+' перцентиль';ops.textContent=nf.format(x.operations_count);perday.textContent=x.operations_per_day;speed.textContent=x.avg_seconds_per_operation+' сек';core.innerHTML=`<tr><th>Рабочих минут</th><td>${nf.format(x.operations_minutes)}</td></tr><tr><th>БЕК</th><td>${nf.format(x.bek_count)} операций / ${nf.format(x.bek_minutes)} минут</td></tr><tr><th>ФРОНТ</th><td>${nf.format(x.front_count)} операций / ${nf.format(x.front_minutes)} минут</td></tr><tr><th>Среднее время</th><td>${x.avg_seconds_per_operation} сек. на операцию</td></tr>`;metrics.innerHTML=x.metrics.map(m=>`<tr><td>${m.name}</td><td>${nf.format(m.count)}</td><td>${nf.format(m.minutes)}</td></tr>`).join('')||'<tr><td colspan=3>Дополнительных операций нет</td></tr>';let m=x.metrics.slice(0,10);new Chart(chart,{type:'bar',data:{labels:m.map(v=>v.name),datasets:[{label:'Операций',data:m.map(v=>v.count),backgroundColor:'#2864ce',borderRadius:7}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}})}).catch(e=>{name.textContent='Ошибка';meta.textContent=e.message})</script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Профиль кассира</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #f5f7fb;
+      color: #162238;
+      font: 14px Inter, Arial, sans-serif;
+    }
+    header {
+      height: 60px;
+      background: #fff;
+      border-bottom: 1px solid #e4eaf2;
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+    }
+    a {
+      color: #2864ce;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .wrap {
+      max-width: 1180px;
+      margin: 25px auto;
+      padding: 0 20px;
+    }
+    .hero, .card {
+      background: #fff;
+      border: 1px solid #e2e9f2;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 5px 17px #2030500d;
+    }
+    .hero h1 {
+      margin: 6px 0;
+      font-size: 29px;
+    }
+    .muted { color: #6f7d90; }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin: 16px 0;
+    }
+    .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #748198;
+      font-weight: bold;
+    }
+    .val {
+      font-size: 25px;
+      font-weight: 800;
+      margin-top: 8px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .chart { height: 340px; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      padding: 11px;
+      border-bottom: 1px solid #edf1f6;
+      text-align: left;
+    }
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #748198;
+    }
+    @media(max-width:700px) {
+      .kpis, .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/dashboard/cashiers.html">← Все кассиры</a>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div class="muted" id="meta">Загрузка профиля…</div>
+      <h1 id="name">—</h1>
+      <div id="sub" class="muted"></div>
+    </section>
+
+    <section class="kpis">
+      <div class="card">
+        <div class="label">Место в рейтинге</div>
+        <div id="rank" class="val">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Операций</div>
+        <div id="ops" class="val">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Операций в день</div>
+        <div id="perday" class="val">—</div>
+      </div>
+      <div class="card">
+        <div class="label">Скорость</div>
+        <div id="speed" class="val">—</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Профиль операций</h3>
+        <div class="chart"><canvas id="chart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>Ключевые показатели</h3>
+        <table id="core"></table>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3>Все операции кассира</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Операция</th>
+            <th>Количество</th>
+            <th>Минут</th>
+          </tr>
+        </thead>
+        <tbody id="metrics"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const id = new URLSearchParams(location.search).get('id');
+    const base = location.origin.includes(':') ? location.origin : `${location.protocol}//${location.hostname}:8000`;
+    const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+
+    if (!id) {
+      document.getElementById('name').textContent = 'ID кассира не указан';
+      document.getElementById('meta').textContent = 'Выберите кассира из общего списка.';
+    } else {
+      fetch(base + '/api/cashiers/' + id)
+        .then(r => {
+          if (!r.ok) throw Error('Профиль не найден');
+          return r.json();
+        })
+        .then(x => {
+          document.title = x.full_name + ' — аналитика';
+          document.getElementById('name').textContent = x.full_name;
+          document.getElementById('meta').textContent = 'Углублённая аналитика кассира · ' + (x.filename || '');
+          document.getElementById('sub').textContent = `№ сотрудника: ${x.employee_number || '—'} · Табель: ${x.tab_number || '—'} · ${x.position || '—'} · рабочих дней: ${x.days_worked || 0} · Нагрузка: ${x.load_percent || 0}% · Разница: ${x.load_difference || 0}`;
+          document.getElementById('rank').textContent = '#' + x.rank_by_operations + ' / ' + (x.percentile ? Math.round(x.percentile) : 0) + ' перцентиль';
+          document.getElementById('ops').textContent = nf.format(x.operations_count);
+          document.getElementById('perday').textContent = x.operations_per_day;
+          document.getElementById('speed').textContent = x.avg_seconds_per_operation + ' сек';
+          
+          document.getElementById('core').innerHTML = `
+            <tr><th>Рабочих минут</th><td>${nf.format(x.operations_minutes)} (${x.hours_str || ''})</td></tr>
+            <tr><th>БЭК</th><td>${nf.format(x.bek_count)} операций / ${nf.format(x.bek_minutes)} минут</td></tr>
+            <tr><th>ФРОНТ</th><td>${nf.format(x.front_count)} операций / ${nf.format(x.front_minutes)} минут</td></tr>
+            <tr><th>Среднее время</th><td>${x.avg_seconds_per_operation} сек. на операцию</td></tr>
+          `;
+
+          const m_list = x.metrics || [];
+          document.getElementById('metrics').innerHTML = m_list.map(m => `
+            <tr>
+              <td><b>${m.name}</b></td>
+              <td>${nf.format(m.count)}</td>
+              <td>${nf.format(m.minutes)}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="3">Дополнительных операций нет</td></tr>';
+
+          let m = m_list.slice(0, 10);
+          new Chart(document.getElementById('chart'), {
+            type: 'bar',
+            data: {
+              labels: m.map(v => v.name),
+              datasets: [{
+                label: 'Операций',
+                data: m.map(v => v.count),
+                backgroundColor: '#2864ce',
+                borderRadius: 7
+              }]
+            },
+            options: {
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } }
+            }
+          });
+        })
+        .catch(e => {
+          document.getElementById('name').textContent = 'Ошибка';
+          document.getElementById('meta').textContent = e.message;
+        });
+    }
+  </script>
+</body>
+</html>
