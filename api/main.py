@@ -45,6 +45,7 @@ from core.db import (
     count_branches, list_branches_full, get_branch, truncate_branches,
     bulk_insert_branches,
 )
+from core.incassation_router import build_regional_routes
 from core.importer import parse_xlsx, REQUIRED_FIELDS, parse_branches_xlsx
 from core.cashier_analytics import parse_cashiers_xlsx, save_cashier_import, cashier_analytics, cashier_detail
 
@@ -544,6 +545,17 @@ async def get_cashier_detail(report_id: int):
     if not item:
         raise HTTPException(404, "Запись кассира не найдена")
     return item
+
+
+# ═══════════════════════════════════════════════════════════
+# РЕГИОНАЛЬНАЯ ИНКАССАЦИЯ
+# ═══════════════════════════════════════════════════════════
+
+@app.post("/api/routes/incassation", summary="Маршруты: филиал-инкассация → ATM своего региона")
+async def regional_incassation_route(status: str = Query("warning", pattern="^(critical|warning|all)$")):
+    atms = list_atms(limit=5000)
+    branches = list_branches_full(incassation=1, limit=5000)
+    return build_regional_routes(atms, branches, status)
 
 
 # ═══════════════════════════════════════════════════════════

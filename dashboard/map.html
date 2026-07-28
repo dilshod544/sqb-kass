@@ -886,6 +886,9 @@
         </div>
       </div>
 
+      <button class="btn btn-primary" onclick="buildRegionalRoute('warning')" style="margin-bottom:4px;">
+        <i data-lucide="building-2" class="icon-inline"></i> По регионам от филиалов
+      </button>
       <button class="btn btn-danger"  onclick="buildRoute('critical')" style="margin-bottom:4px;">
         <i data-lucide="siren" class="icon-inline"></i> Только критичные
       </button>
@@ -2152,6 +2155,24 @@ const CAR_LABELS  = ['Машина A', 'Машина B', 'Машина C', 'Ма
 let routeControls = [];   // Leaflet Routing Machine контролы (локальный режим)
 let routingLayers = [];   // обычные полилинии (WebSocket-режим)
 let depotMarker   = null;
+
+async function buildRegionalRoute(status) {
+  clearRoute();
+  try {
+    const data = await fetch(`${API_BASE}/api/routes/incassation?status=${status}`, {method:'POST'}).then(r=>r.json());
+    if (!data.cars || !data.cars.length) { alert('Нет маршрутов: загрузите филиалы с «Инкассация = 1» и ATM с координатами.'); return; }
+    data.cars.forEach((car,i)=>{
+      const pts=car.geometry.map(p=>[p.lat,p.lon]);
+      const color=CAR_COLORS[i%CAR_COLORS.length];
+      routingLayers.push(L.polyline(pts,{color,weight:5,opacity:.85}).addTo(map));
+      const first=car.geometry[0];
+      routingLayers.push(L.marker([first.lat,first.lon]).addTo(map).bindPopup(`<b>Старт: ${car.departure_branch.name}</b><br>${car.region}<br>${car.departure_branch.address||''}`));
+    });
+    const warnings=(data.unserved_regions||[]).map(x=>`${x.region}: ${x.reason}`).join('<br>');
+    document.getElementById('route-info').innerHTML=`<b>Региональные маршруты: ${data.cars.length}</b><br>Старт/финиш: филиал с Инкассация = 1<br>Остановок: ${data.total_stops} · ${data.total_dist_km} км · ~${data.est_time_min} мин${warnings?'<br><span style="color:#dc2626">'+warnings+'</span>':''}`;
+    const all=data.cars.flatMap(c=>c.geometry.map(p=>[p.lat,p.lon])); if(all.length) map.fitBounds(all,{padding:[45,45]});
+  } catch(e) { alert('Ошибка построения регионального маршрута: '+e.message); }
+}
 
 async function buildRoute(filterStatus) {
   clearRoute();
