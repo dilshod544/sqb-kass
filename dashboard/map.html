@@ -886,9 +886,6 @@
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="buildRegionalRoute('warning')" style="margin-bottom:4px;">
-        <i data-lucide="building-2" class="icon-inline"></i> По регионам от филиалов
-      </button>
       <button class="btn btn-danger"  onclick="buildRoute('critical')" style="margin-bottom:4px;">
         <i data-lucide="siren" class="icon-inline"></i> Только критичные
       </button>
@@ -2175,6 +2172,8 @@ async function buildRegionalRoute(status) {
 }
 
 async function buildRoute(filterStatus) {
+  // All standard modes are region-first: purple incassation branch is the depot.
+  return buildRegionalRoute(filterStatus);
   clearRoute();
 
   const numCars  = parseInt(document.getElementById('num-cars').value)  || 2;

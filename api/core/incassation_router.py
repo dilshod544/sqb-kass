@@ -9,6 +9,8 @@ def order(start,points):
  while remaining:
   nxt=min(remaining,key=lambda x:km(cur,x));out.append(nxt);remaining.remove(nxt);cur=nxt
  return out
+def region_key(value):
+ return ''.join(str(value or '').lower().replace('ё','е').replace('ў','у').replace('қ','к').split())
 def build_regional_routes(atms,branches,status='warning'):
  # Only branches marked incassation=1 can be departure points; regions never mix.
  valid=[b for b in branches if b.get('incassation')==1 and b.get('lat') is not None and b.get('lon') is not None]
@@ -17,10 +19,10 @@ def build_regional_routes(atms,branches,status='warning'):
   if a.get('lat') is None or a.get('lon') is None:continue
   if status=='critical' and a.get('status')!='critical':continue
   if status=='warning' and a.get('status') not in ('critical','warning'):continue
-  groups.setdefault(a.get('region') or 'Не указан',[]).append(a)
+  region=a.get('region') or 'Не указан'; groups.setdefault(region,[]).append(a)
  cars=[];unserved=[]
  for region,targets in groups.items():
-  depots=[b for b in valid if (b.get('region') or '')==region]
+  depots=[b for b in valid if region_key(b.get('region'))==region_key(region)]
   if not depots:
    unserved.append({'region':region,'atms':[a['terminal_id'] for a in targets],'reason':'Нет филиала с признаком «Инкассация = 1» в этом регионе'})
    continue

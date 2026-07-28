@@ -30,6 +30,7 @@ import shutil
 import tempfile
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
@@ -557,6 +558,24 @@ async def regional_incassation_route(status: str = Query("warning", pattern="^(c
     branches = list_branches_full(incassation=1, limit=5000)
     return build_regional_routes(atms, branches, status)
 
+@app.get("/api/incassation/plan", summary="48-часовой прогнозный план инкассации")
+async def incassation_plan(days: int = Query(2, ge=1, le=14)):
+    atms = list_atms(limit=5000)
+    # Conservative operational forecast: burn rate is derived from current fill level;
+    # it is replaced by the ML predictor once transaction history is connected.
+    now = datetime.now(timezone.utc)
+    planned = []
+    for a in atms:
+        cap, bal = a.get("capacity") or 400_000_000, a.get("balance")
+        if bal is None or not cap: continue
+        pct = bal / cap
+        burn_per_day = max(cap * 0.035, (1 - pct) * cap * 0.18)
+        hours = max(0, (bal - cap * 0.20) / burn_per_day * 24)
+        if hours <= days * 24:
+            due = now + timedelta(hours=hours)
+            planned.append({"terminal_id":a["terminal_id"],"address":a.get("address"),"region":a.get("region"),"due_at":due.isoformat(),"hours_to_low_cash":round(hours,1),"priority":"critical" if hours < 12 else "high" if hours < 24 else "planned","recommended_refill":round(max(0,cap*0.8-bal))})
+    planned.sort(key=lambda x: x["hours_to_low_cash"])
+    return {"generated_at":now.isoformat(),"horizon_days":days,"planned_atms":planned,"count":len(planned),"note":"Прогнозный план; при подключённой истории транзакций burn-rate заменяется ML-прогнозом."}
 
 # ═══════════════════════════════════════════════════════════
 # GEOJSON
