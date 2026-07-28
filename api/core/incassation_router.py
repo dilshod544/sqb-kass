@@ -14,11 +14,17 @@ def region_key(value):
 def build_regional_routes(atms,branches,status='warning'):
  # Only branches marked incassation=1 can be departure points; regions never mix.
  valid=[b for b in branches if b.get('incassation')==1 and b.get('lat') is not None and b.get('lon') is not None]
+ eligible=[a for a in atms if a.get('lat') is not None and a.get('lon') is not None]
+ if status=='critical': targets=[a for a in eligible if a.get('status')=='critical']
+ elif status=='warning': targets=[a for a in eligible if a.get('status') in ('critical','warning')]
+ else: targets=eligible
+ # A registry import has no balances yet. Do not report a misleading "no data" error:
+ # build a provisional regional route and explicitly mark it as awaiting live balances.
+ fallback_unknown=False
+ if not targets and status in ('critical','warning'):
+  targets=[a for a in eligible if a.get('status')=='unknown']; fallback_unknown=bool(targets)
  groups={}
- for a in atms:
-  if a.get('lat') is None or a.get('lon') is None:continue
-  if status=='critical' and a.get('status')!='critical':continue
-  if status=='warning' and a.get('status') not in ('critical','warning'):continue
+ for a in targets:
   region=a.get('region') or 'Не указан'; groups.setdefault(region,[]).append(a)
  cars=[];unserved=[]
  for region,targets in groups.items():
@@ -35,4 +41,4 @@ def build_regional_routes(atms,branches,status='warning'):
    if not pts:continue
    seq=order(b,pts); route=[b,*seq,b]; distance=sum(km(route[i],route[i+1]) for i in range(len(route)-1))*1.35
    cars.append({'region':region,'departure_branch':{'local_code':b.get('local_code'),'address':b.get('address'),'name':'Филиал '+str(b.get('local_code') or b.get('number') or '')},'stops':[{'terminal_id':a['terminal_id'],'address':a.get('address'),'lat':a['lat'],'lon':a['lon'],'status':a.get('status')} for a in seq],'geometry':[{'lat':p['lat'],'lon':p['lon']} for p in route],'distance_km':round(distance,2),'est_time_min':round(distance/30*60)})
- return {'strategy':'Регион → филиал с инкассацией → банкоматы того же региона → филиал','cars':cars,'unserved_regions':unserved,'total_stops':sum(len(c['stops']) for c in cars),'total_dist_km':round(sum(c['distance_km'] for c in cars),2),'est_time_min':sum(c['est_time_min'] for c in cars)}
+ return {'strategy':'Регион → филиал с инкассацией → банкоматы того же региона → филиал','cars':cars,'unserved_regions':unserved,'fallback_unknown_balances':fallback_unknown,'diagnostics':{'atms_total':len(atms),'atms_with_coordinates':len(eligible),'eligible_branches':len(valid),'target_atms':len(targets),'regions_with_targets':len(groups)},'total_stops':sum(len(c['stops']) for c in cars),'total_dist_km':round(sum(c['distance_km'] for c in cars),2),'est_time_min':sum(c['est_time_min'] for c in cars)}

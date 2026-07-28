@@ -2157,7 +2157,7 @@ async function buildRegionalRoute(status) {
   clearRoute();
   try {
     const data = await fetch(`${API_BASE}/api/routes/incassation?status=${status}`, {method:'POST'}).then(r=>r.json());
-    if (!data.cars || !data.cars.length) { alert('Нет маршрутов: загрузите филиалы с «Инкассация = 1» и ATM с координатами.'); return; }
+    if (!data.cars || !data.cars.length) { const d=data.diagnostics||{}; alert(`Маршрут не построен. ATM в БД: ${d.atms_total||0}; ATM с координатами: ${d.atms_with_coordinates||0}; филиалов с Инкассация=1: ${d.eligible_branches||0}; ATM для выбранного режима: ${d.target_atms||0}. Проверьте совпадение региона у ATM и филиала.`); return; }
     data.cars.forEach((car,i)=>{
       const pts=car.geometry.map(p=>[p.lat,p.lon]);
       const color=CAR_COLORS[i%CAR_COLORS.length];
@@ -2166,7 +2166,7 @@ async function buildRegionalRoute(status) {
       routingLayers.push(L.marker([first.lat,first.lon]).addTo(map).bindPopup(`<b>Старт: ${car.departure_branch.name}</b><br>${car.region}<br>${car.departure_branch.address||''}`));
     });
     const warnings=(data.unserved_regions||[]).map(x=>`${x.region}: ${x.reason}`).join('<br>');
-    document.getElementById('route-info').innerHTML=`<b>Региональные маршруты: ${data.cars.length}</b><br>Старт/финиш: филиал с Инкассация = 1<br>Остановок: ${data.total_stops} · ${data.total_dist_km} км · ~${data.est_time_min} мин${warnings?'<br><span style="color:#dc2626">'+warnings+'</span>':''}`;
+    document.getElementById('route-info').innerHTML=`<b>Региональные маршруты: ${data.cars.length}</b><br>Старт/финиш: филиал с Инкассация = 1<br>Остановок: ${data.total_stops} · ${data.total_dist_km} км · ~${data.est_time_min}${data.fallback_unknown_balances?'<br><span style="color:#d97706">Нет актуальных балансов: показан предварительный маршрут по ATM с неизвестным статусом.</span>':''}${warnings?'<br><span style="color:#dc2626">'+warnings+'</span>':''}`;
     const all=data.cars.flatMap(c=>c.geometry.map(p=>[p.lat,p.lon])); if(all.length) map.fitBounds(all,{padding:[45,45]});
   } catch(e) { alert('Ошибка построения регионального маршрута: '+e.message); }
 }
