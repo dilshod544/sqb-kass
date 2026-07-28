@@ -55,21 +55,34 @@ def save_cashier_import(filename,parsed):
 def _enrich(x,detail=False):
  x['avg_seconds_per_operation']=round(x['operations_minutes']*60/x['operations_count'],1) if x['operations_count'] else 0;x['operations_per_day']=round(x['operations_count']/x['days_worked'],1) if x['days_worked'] else 0
  raw=json.loads(x.pop('metrics_json') or '{}'); ops=raw.get('operations',{})
- if detail:x['employee_number']=raw.get('employee_number');x['load_percent']=raw.get('load_percent',0);x['load_difference']=raw.get('load_difference',0);x['metrics']=[{'name':n,**v} for n,v in ops.items()]
+ if detail:
+  x['employee_number']=raw.get('employee_number');x['load_percent']=raw.get('load_percent',0);x['load_difference']=raw.get('load_difference',0);x['cashier_type']=cashier_role(x)
+  x['metrics']=[{'name':n,'section':'БЭК-операции' if n in BACK_GROUPS else 'ФРОНТ-операции' if n in FRONT_GROUPS else 'Прочее',**v} for n,v in ops.items()]
  return x,ops
-def cashier_analytics(import_id=None,page=1,page_size=25):
+BACK_GROUPS={'Амалга оширилган операциялар сони (кирим-чиқим)','Банкоматга пул қўйиш','Касса мудири','Кечки кассир','Назоратчи кассир ролини бажарганда','Купюра санаш','Кирим, чиқим ҳужжатини текшириш, расмийлаштириш','БЕК фарқ'}
+FRONT_GROUPS={'ВАЛЮТА 100$','ВАЛЮТА 100,01–1000$','ВАЛЮТА 1000,01–5000$','ВАЛЮТА 10000$','ВАЛЮТА 5000,01–10000$','Коммунал тўловлар (кирим-чиқим)','Пластик карта тарқатиш','Пластикдан нақд пул ечиш','ФРОНТ фарқ'}
+def cashier_role(row):
+ b,f=row.get('bek_count',0),row.get('front_count',0)
+ if b>0 and f>0:return 'universal'
+ return 'back' if b>0 else ('front' if f>0 else 'unknown')
+def cashier_analytics(import_id=None,page=1,page_size=25,role=None):
  with _connect() as c:
   if import_id is None:
    q=c.execute('SELECT id FROM cashier_imports ORDER BY id DESC LIMIT 1').fetchone();import_id=q['id'] if q else None
   if not import_id:return {'summary':{},'cashiers':[],'categories':[],'import':None,'page':1,'total_pages':1,'total':0}
   info=dict(c.execute('SELECT * FROM cashier_imports WHERE id=?',(import_id,)).fetchone());rows=[dict(z) for z in c.execute('SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC',(import_id,))]
+ for x in rows:x['cashier_type']=cashier_role(x)
+ all_rows=rows
+ if role in ('back','front','universal'): rows=[x for x in rows if x['cashier_type']==role]
  cats={}
+ allowed=BACK_GROUPS if role=='back' else FRONT_GROUPS if role=='front' else None
  for x in rows:
   _,ops=_enrich(x)
   for n,v in ops.items():
+   if allowed is not None and n not in allowed:continue
    a=cats.setdefault(n,{'name':n,'count':0,'minutes':0});a['count']+=v.get('count',0);a['minutes']+=v.get('minutes',0)
  total=len(rows);page=max(1,page);page_size=min(max(1,page_size),100);start=(page-1)*page_size
- return {'import':info,'summary':{'cashiers':total,'operations':round(sum(x['operations_count'] for x in rows)),'minutes':round(sum(x['operations_minutes'] for x in rows)),'avg_seconds_per_operation':round(sum(x['operations_minutes'] for x in rows)*60/sum(x['operations_count'] for x in rows),1) if sum(x['operations_count'] for x in rows) else 0,'bek_operations':round(sum(x['bek_count'] for x in rows)),'front_operations':round(sum(x['front_count'] for x in rows))},'cashiers':rows[start:start+page_size],'categories':sorted(cats.values(),key=lambda x:x['count'],reverse=True),'page':page,'page_size':page_size,'total':total,'total_pages':max(1,(total+page_size-1)//page_size)}
+ return {'import':info,'summary':{'cashiers':total,'operations':round(sum(x['operations_count'] for x in rows)),'minutes':round(sum(x['operations_minutes'] for x in rows)),'avg_seconds_per_operation':round(sum(x['operations_minutes'] for x in rows)*60/sum(x['operations_count'] for x in rows),1) if sum(x['operations_count'] for x in rows) else 0,'bek_operations':round(sum(x['bek_count'] for x in rows)),'front_operations':round(sum(x['front_count'] for x in rows)),'back_cashiers':sum(x['cashier_type']=='back' for x in all_rows),'front_cashiers':sum(x['cashier_type']=='front' for x in all_rows),'universal_cashiers':sum(x['cashier_type']=='universal' for x in all_rows)},'cashiers':rows[start:start+page_size],'categories':sorted(cats.values(),key=lambda x:x['count'],reverse=True),'page':page,'page_size':page_size,'total':total,'total_pages':max(1,(total+page_size-1)//page_size)}
 def cashier_detail(report_id):
  with _connect() as c:
   r=c.execute('SELECT r.*,i.filename,i.imported_at FROM cashier_reports r JOIN cashier_imports i ON i.id=r.import_id WHERE r.id=?',(report_id,)).fetchone()

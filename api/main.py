@@ -533,8 +533,9 @@ async def get_cashier_analytics(
     import_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
+    role: Optional[str] = Query(None, pattern="^(back|front|universal)$"),
 ):
-    return cashier_analytics(import_id, page, page_size)
+    return cashier_analytics(import_id, page, page_size, role)
 
 
 @app.get("/api/cashiers/{report_id}", summary="Углублённая аналитика одного кассира")
