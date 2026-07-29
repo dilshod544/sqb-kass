@@ -127,12 +127,10 @@
       <div class="option-title">Импорт банкоматов</div>
       <p class="option-desc">
         Реестр ATM: номера, локал коды, области, филиалы, модели, серийные номера,
-        Merchant/Terminal ID, адреса и геолокация. Поддерживает узбекские, русские
-        и английские заголовки колонок.
+        Merchant/Terminal ID, адреса и геолокация.
       </p>
       <div class="option-cols">
-        Колонки: <code>№</code> <code>Локал код</code> <code>Худуд</code> <code>Филиал</code>
-        <code>Модель</code> <code>Term id</code> <code>Манзили</code> <code>Lat/Lon</code> и др.
+        Колонки: <code>№</code> <code>Локал код</code> <code>Худуд</code> <code>Филиал</code> <code>Term id</code>
       </div>
       <div class="option-action">Перейти к импорту банкоматов <i data-lucide="arrow-right"></i></div>
     </a>
@@ -141,17 +139,36 @@
       <div class="option-icon branch"><i data-lucide="building-2"></i></div>
       <div class="option-title">Импорт филиалов</div>
       <p class="option-desc">
-        Реестр филиалов банка с координатами и признаком, предназначен ли филиал
-        для выезда инкассаторов. Данные сразу отображаются на карте как отдельный
-        слой с двумя типами точек.
+        Реестр филиалов банка с координатами и признаком выезда инкассаторов.
       </p>
       <div class="option-cols">
-        Колонки: <code>№</code> <code>Локал код</code> <code>Регион</code>
-        <code>Адрес</code> <code>Lat</code> <code>Lon</code> <code>Инкассация</code><br>
-        <code>Инкассация = 0</code> — не для выезда инкассаторов ·
-        <code>Инкассация = 1</code> — предназначен для выезда инкассаторов
+        Колонки: <code>№</code> <code>Локал код</code> <code>Регион</code> <code>Адрес</code> <code>Инкассация</code>
       </div>
       <div class="option-action">Перейти к импорту филиалов <i data-lucide="arrow-right"></i></div>
+    </a>
+
+    <a class="option-card" href="/dashboard/import-cashiers.html">
+      <div class="option-icon atm" style="background: linear-gradient(135deg, #059669, #34d399); box-shadow: 0 8px 20px rgba(5,150,105,.3)"><i data-lucide="calculator"></i></div>
+      <div class="option-title">Импорт 1: Состояние касс (KPI)</div>
+      <p class="option-desc">
+        Операционный отчёт кассиров: количество операций, рабочие минуты, нагрузка %, расхождение, БЭК и ФРОНТ.
+      </p>
+      <div class="option-cols">
+        Колонки: <code>ФИО</code> <code>Табель</code> <code>Дни</code> <code>Операции</code> <code>Минуты</code> <code>Юклама %</code>
+      </div>
+      <div class="option-action" style="color:#059669">Перейти к импорту KPI касс <i data-lucide="arrow-right"></i></div>
+    </a>
+
+    <a class="option-card" href="/dashboard/import-cashier-status.html">
+      <div class="option-icon branch" style="background: linear-gradient(135deg, #7c3aed, #c084fc); box-shadow: 0 8px 20px rgba(124,58,237,.3)"><i data-lucide="user-check"></i></div>
+      <div class="option-title">Импорт 2: Состояние кассиров (Штат)</div>
+      <p class="option-desc">
+        Реестр штата кассиров: структура филиалов, отпуска <code>(мехнат.тат.)</code>, декреты <code>(декрет2)</code>, временные очредники <code>(вакт.)</code>.
+      </p>
+      <div class="option-cols">
+        Колонки: <code>Филиал</code> <code>Должность</code> <code>ФИО</code> <code>Отметка статуса</code>
+      </div>
+      <div class="option-action" style="color:#7c3aed">Перейти к импорту штата кассиров <i data-lucide="arrow-right"></i></div>
     </a>
   </div>
 </div>

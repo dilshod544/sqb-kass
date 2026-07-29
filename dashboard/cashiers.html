@@ -231,9 +231,10 @@
         <h2>Аналитика работы кассиров</h2>
         <p>Загрузите Excel-отчёт в формате «Kassirlar bo‘yicha». Сервис распознаёт двухуровневую шапку, считает KPI, рейтинг производительности и структуру операций.</p>
       </div>
-      <div class="upload">
-        <b>Новый отчёт кассиров</b><br>
-        <a href="/dashboard/import-cashiers.html" class="btn" style="display:inline-block;text-decoration:none;margin-top:10px">Открыть импорт →</a>
+      <div class="upload" style="display:flex;flex-direction:column;gap:8px">
+        <b>Импорт отчётов кассиров</b>
+        <a href="/dashboard/import-cashiers.html" class="btn" style="display:inline-block;text-decoration:none;background:#2563eb">1. Импорт KPI касс →</a>
+        <a href="/dashboard/import-cashier-status.html" class="btn" style="display:inline-block;text-decoration:none;background:#7c3aed">2. Импорт штата и отпусков →</a>
       </div>
     </section>
 
@@ -241,7 +242,7 @@
 
     <div class="search-bar">
       <i data-lucide="search" style="color:#64748b;width:18px;height:18px"></i>
-      <input type="text" id="search-input" placeholder="Поиск кассира по ФИО, должности, табелю или номеру сотрудника…" oninput="onSearchInput()">
+      <input type="text" id="search-input" placeholder="Поиск кассира по ФИО, должности, филиалу, табелю или статусу…" oninput="onSearchInput()">
       <select id="position-select" onchange="onPositionSelect()" style="border:1px solid #cbd5e1;padding:6px 12px;border-radius:10px;outline:0;font-size:13px;background:#fff;color:#1e293b;cursor:pointer">
         <option value="">Все должности</option>
       </select>
@@ -251,7 +252,16 @@
       <button class="btn role active" data-role="" onclick="setRole('')">Все кассиры</button>
       <button class="btn role" data-role="back" onclick="setRole('back')">БЭК-кассиры</button>
       <button class="btn role" data-role="front" onclick="setRole('front')">ФРОНТ-кассиры</button>
-      <button class="btn role" data-role="universal" onclick="setRole('universal')">Универсальные</button>
+      <button class="btn role" data-role="universal" onclick="setRole('universal')">Универсальные / Назоратчи</button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px">
+      <button class="btn st-btn active" data-status="" onclick="setStatus('')" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1">Все HR-статусы</button>
+      <button class="btn st-btn" data-status="active" onclick="setStatus('active')" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0">🟢 Работают</button>
+      <button class="btn st-btn" data-status="vacation" onclick="setStatus('vacation')" style="background:#e0f2fe;color:#075985;border:1px solid #bae6fd">🔵 В отпуске</button>
+      <button class="btn st-btn" data-status="maternity" onclick="setStatus('maternity')" style="background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff">🟣 В декрете</button>
+      <button class="btn st-btn" data-status="temporary" onclick="setStatus('temporary')" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">🟡 Временные (замещающие)</button>
+      <button class="btn st-btn" data-status="no_replacement" onclick="setStatus('no_replacement')" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Без замены</button>
     </div>
 
     <section class="kpis">
@@ -260,20 +270,20 @@
         <div class="val" id="k-cash">—</div>
       </div>
       <div class="card kpi">
-        <div class="label">Операций</div>
-        <div class="val" id="k-ops">—</div>
+        <div class="label">Ортача Samaradorlik Balli</div>
+        <div class="val" id="k-score" style="color:#2563eb;font-size:22px">— / 100</div>
       </div>
       <div class="card kpi">
-        <div class="label">Рабочих минут (часов)</div>
-        <div class="val" id="k-min">—</div>
+        <div class="label">Работают / В декрете</div>
+        <div class="val" id="k-status-stat" style="font-size:18px;margin-top:14px">—</div>
       </div>
       <div class="card kpi">
-        <div class="label">Среднее на операцию</div>
-        <div class="val" id="k-speed">—</div>
+        <div class="label">Без замены (Внимание)</div>
+        <div class="val" id="k-noreplace" style="font-size:22px;color:#dc2626">—</div>
       </div>
       <div class="card kpi">
-        <div class="label">БЭК / ФРОНТ</div>
-        <div class="val" id="k-bf">—</div>
+        <div class="label">Средняя нагрузка %</div>
+        <div class="val" id="k-load">—</div>
       </div>
     </section>
 
@@ -293,20 +303,21 @@
     </section>
 
     <section class="card tableCard">
-      <h3>Рейтинг и эффективность</h3>
+      <h3>Рейтинг va Samaradorlik Ballari (Efficiency Score 0-100)</h3>
       <table>
         <thead>
           <tr>
             <th>Кассир</th>
+            <th>Балл Samaradorlik</th>
             <th>Табель</th>
             <th>Должность</th>
-            <th>Дней</th>
+            <th>Дней (% нормы)</th>
             <th>Операций</th>
             <th>Опер./день</th>
-            <th>Минут</th>
-            <th>Сек./операцию</th>
-            <th>БЭК</th>
-            <th>ФРОНТ</th>
+            <th>Нагрузка %</th>
+            <th>БЭК (% улуши)</th>
+            <th>ФРОНТ (% улуши)</th>
+            <th>Сек./опер.</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -323,12 +334,44 @@
   <div class="modal-overlay" id="detail-modal" onclick="closeModalOnOverlay(event)">
     <div class="modal-card">
       <button class="modal-close" onclick="closeModal()">✕</button>
-      <div style="display:flex;gap:12px;align-items:center">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <span id="m-role-badge" class="badge-role badge-universal">Универсальный</span>
+        <span id="m-hr-status-badge" style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#dcfce7;color:#166534">🟢 Работает</span>
         <span class="muted" id="m-meta">№ сотрудника: — · Табель: —</span>
       </div>
-      <h2 id="m-name" style="margin:8px 0 4px;font-size:24px">—</h2>
+      
+      <h2 id="m-name" style="margin:10px 0 4px;font-size:24px">—</h2>
       <div id="m-pos" style="color:#475569;font-weight:600">—</div>
+      <div id="m-branch-str" style="color:#64748b;font-size:13px;margin-top:2px">Филиал: —</div>
+
+      <!-- HR Replacement Banner -->
+      <div id="m-hr-banner" style="display:none;margin-top:12px;padding:12px 16px;border-radius:12px;font-size:13px;line-height:1.5"></div>
+
+      <!-- Score & KPI Grid -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:16px;margin:16px 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <b style="font-size:15px;color:#1e293b">⭐ Samaradorlik Balli (Efficiency Score)</b>
+          <div id="m-score-val" style="font-size:22px;font-weight:850;color:#2563eb">— / 100</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;text-align:center" id="m-score-grid">
+          <div style="background:#fff;padding:10px;border-radius:10px;border:1px solid #e2e8f0">
+            <small class="muted">Yuklama (35 max)</small>
+            <div id="m-sc-load" style="font-weight:800;font-size:16px;margin-top:4px;color:#16a34a">—</div>
+          </div>
+          <div style="background:#fff;padding:10px;border-radius:10px;border:1px solid #e2e8f0">
+            <small class="muted">Hajm (30 max)</small>
+            <div id="m-sc-ops" style="font-weight:800;font-size:16px;margin-top:4px;color:#2563eb">—</div>
+          </div>
+          <div style="background:#fff;padding:10px;border-radius:10px;border:1px solid #e2e8f0">
+            <small class="muted">Tezlik (20 max)</small>
+            <div id="m-sc-speed" style="font-weight:800;font-size:16px;margin-top:4px;color:#7c3aed">—</div>
+          </div>
+          <div style="background:#fff;padding:10px;border-radius:10px;border:1px solid #e2e8f0">
+            <small class="muted">Davomat (15 max)</small>
+            <div id="m-sc-days" style="font-weight:800;font-size:16px;margin-top:4px;color:#d97706">—</div>
+          </div>
+        </div>
+      </div>
 
       <div class="modal-kpi-grid">
         <div class="modal-kpi">
@@ -378,12 +421,21 @@
 
   <script>
     const base = location.origin.includes(':') ? location.origin : `${location.protocol}//${location.hostname}:8000`;
-    let charts = [], modalChart = null, currentPage = 1, totalPages = 1, selectedRole = '', selectedPosition = '', searchQuery = '', searchTimeout = null, globalTopByPosition = {};
+    let charts = [], modalChart = null, currentPage = 1, totalPages = 1, selectedRole = '', selectedStatus = '', selectedPosition = '', searchQuery = '', searchTimeout = null, globalTopByPosition = {};
     const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
     function destroy() {
       charts.forEach(x => x.destroy());
       charts = [];
+    }
+
+    function setStatus(st) {
+      selectedStatus = st;
+      currentPage = 1;
+      document.querySelectorAll('.st-btn').forEach(b => {
+        b.classList.toggle('active', (b.dataset.status || '') === st);
+      });
+      load();
     }
 
     function onSearchInput() {
@@ -517,6 +569,7 @@
     async function load() {
       try {
         let url = base + `/api/cashiers/analytics?page=${currentPage}&page_size=25&role=${selectedRole}`;
+        if (selectedStatus) url += `&status=${encodeURIComponent(selectedStatus)}`;
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
         if (selectedPosition) url += `&position=${encodeURIComponent(selectedPosition)}`;
 
@@ -533,15 +586,16 @@
         window.currentCashiersList = d.cashiers;
 
         const filterLabel = selectedRole === 'back' ? ' (БЭК)' : selectedRole === 'front' ? ' (ФРОНТ)' : selectedRole === 'universal' ? ' (Универсальные)' : '';
+        const stLabel = selectedStatus ? ` · Status: ${selectedStatus}` : '';
         const posLabel = selectedPosition ? ` · ${selectedPosition}` : '';
-        document.getElementById('notice').textContent = `Отчёт: ${d.import.filename} · импортирован ${new Date(d.import.imported_at).toLocaleString('ru-RU')}${filterLabel}${posLabel}`;
+        document.getElementById('notice').textContent = `Отчёт: ${d.import.filename} · импортирован ${new Date(d.import.imported_at).toLocaleString('ru-RU')}${filterLabel}${stLabel}${posLabel}`;
         
         document.getElementById('lbl-cash').textContent = selectedRole ? `Кассиров${filterLabel}` : 'Кассиров';
         document.getElementById('k-cash').textContent = s.cashiers;
-        document.getElementById('k-ops').textContent = nf.format(s.operations);
-        document.getElementById('k-min').textContent = `${nf.format(s.minutes)} (${s.hours || 0} ч)`;
-        document.getElementById('k-speed').textContent = s.avg_seconds_per_operation + ' сек';
-        document.getElementById('k-bf').textContent = nf.format(s.bek_operations) + ' / ' + nf.format(s.front_operations);
+        document.getElementById('k-score').textContent = `${s.avg_efficiency_score || 0} / 100`;
+        document.getElementById('k-status-stat').textContent = `${s.active_cashiers || 0} / ${s.maternity_cashiers || 0}`;
+        document.getElementById('k-noreplace').textContent = (s.no_replacement_cashiers || 0) + ' чел.';
+        document.getElementById('k-load').textContent = (s.avg_load_percent || 0) + '%';
 
         document.getElementById('chart-top-title').textContent = `Топ 10 кассиров${posLabel}`;
         document.getElementById('chart-cats-title').textContent = `Структура операций (%) ${filterLabel}`;
@@ -558,20 +612,52 @@
         document.getElementById('prev').disabled = currentPage <= 1;
         document.getElementById('next').disabled = currentPage >= totalPages;
 
-        document.getElementById('rows').innerHTML = d.cashiers.map(x => `
+        document.getElementById('rows').innerHTML = d.cashiers.map(x => {
+          const loadColor = (x.load_percent > 100) ? '#dc2626' : (x.load_percent >= 70) ? '#16a34a' : '#d97706';
+          
+          let statusBadgeHTML = '';
+          if (x.hr_status_code === 'maternity') {
+            const badgeCls = x.has_replacement ? 'background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff' : 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:4px;${badgeCls}">🟣 ${x.hr_status_label}</div>`;
+          } else if (x.hr_status_code === 'vacation') {
+            const badgeCls = x.has_replacement ? 'background:#e0f2fe;color:#075985;border:1px solid #bae6fd' : 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:4px;${badgeCls}">🔵 ${x.hr_status_label}</div>`;
+          } else if (x.hr_status_code === 'temporary') {
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:4px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">🟡 ${x.hr_status_label}</div>`;
+          } else {
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:4px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">🟢 Работает</div>`;
+          }
+
+          const score = x.efficiency_score || 0;
+          const scoreBg = score >= 85 ? 'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0' :
+                          score >= 70 ? 'background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd' :
+                          score >= 50 ? 'background:#fef3c7;color:#b45309;border:1px solid #fde68a' :
+                          'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5';
+
+          return `
           <tr style="cursor:pointer" onclick="openCashierModal(${x.id})" title="Открыть аналитику кассира">
-            <td><b>${x.full_name}</b><br><span class="muted">${x.cashier_type === 'back' ? 'БЭК' : x.cashier_type === 'front' ? 'ФРОНТ' : x.cashier_type === 'universal' ? 'Универсальный' : 'Не определён'} · Нажать для анализа →</span></td>
+            <td><b>${x.full_name}</b><br>${statusBadgeHTML}</td>
+            <td>
+              <div style="font-weight:800;font-size:12px;padding:3px 8px;border-radius:8px;display:inline-block;${scoreBg}">⭐ ${score} / 100</div>
+              <br><small class="muted">${x.efficiency_grade || ''}</small>
+            </td>
             <td>${x.tab_number || '—'}</td>
-            <td>${x.position || '—'}</td>
-            <td>${nf.format(x.days_worked)}</td>
+            <td>${x.position || '—'}<br><small class="muted">${x.branch_name || ''}</small></td>
+            <td><b>${nf.format(x.days_worked)}</b> <small class="muted">(${x.days_worked_pct}%)</small></td>
             <td><b>${nf.format(x.operations_count)}</b></td>
             <td>${nf.format(x.operations_per_day)}</td>
-            <td>${nf.format(x.operations_minutes)}</td>
-            <td>${x.avg_seconds_per_operation}</td>
-            <td>${nf.format(x.bek_count)}</td>
-            <td>${nf.format(x.front_count)}</td>
+            <td>
+              <div style="font-weight:800;color:${loadColor}">${x.load_percent}%</div>
+              <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:3px;width:54px;overflow:hidden">
+                <div style="height:100%;background:${loadColor};width:${Math.min(x.load_percent, 100)}%"></div>
+              </div>
+            </td>
+            <td>${nf.format(x.bek_count)} <small class="muted">(${x.bek_pct}%)</small></td>
+            <td>${nf.format(x.front_count)} <small class="muted">(${x.front_pct}%)</small></td>
+            <td>${x.avg_seconds_per_operation}s</td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
       } catch(e) {
         document.getElementById('notice').textContent = 'Не удалось получить данные: ' + e.message;
       }
@@ -585,6 +671,7 @@
 
         document.getElementById('m-name').textContent = x.full_name;
         document.getElementById('m-pos').textContent = x.position || 'Должность не указана';
+        document.getElementById('m-branch-str').textContent = 'Филиал: ' + (x.branch_name || 'Не указан');
         document.getElementById('m-meta').textContent = `№ сотрудника: ${x.employee_number || '—'} · Табель: ${x.tab_number || '—'}`;
         
         const badge = document.getElementById('m-role-badge');
@@ -595,6 +682,48 @@
         } else {
           badge.className = 'badge-role badge-universal'; badge.textContent = 'Универсальный';
         }
+
+        const hrBadge = document.getElementById('m-hr-status-badge');
+        const hrBanner = document.getElementById('m-hr-banner');
+
+        if (x.hr_status_code === 'maternity') {
+          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff' : 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
+          hrBadge.textContent = `🟣 ${x.hr_status_label}`;
+        } else if (x.hr_status_code === 'vacation') {
+          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#e0f2fe;color:#075985;border:1px solid #bae6fd' : 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
+          hrBadge.textContent = `🔵 ${x.hr_status_label}`;
+        } else if (x.hr_status_code === 'temporary') {
+          hrBadge.style.cssText = 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#fef3c7;color:#92400e;border:1px solid #fde68a';
+          hrBadge.textContent = `🟡 ${x.hr_status_label}`;
+        } else {
+          hrBadge.style.cssText = 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0';
+          hrBadge.textContent = `🟢 Работает`;
+        }
+
+        if (x.replacing_full_name) {
+          hrBanner.style.display = 'block';
+          hrBanner.style.background = '#fef3c7'; hrBanner.style.color = '#92400e'; hrBanner.style.border = '1px solid #fde68a';
+          hrBanner.innerHTML = `<b>🟡 Временный замещающий сотрудник</b><br>Замещает основной штатную единицу: <b>${x.replacing_full_name}</b>`;
+        } else if (x.replaced_by_full_name) {
+          hrBanner.style.display = 'block';
+          hrBanner.style.background = '#f3e8ff'; hrBanner.style.color = '#6b21a8'; hrBanner.style.border = '1px solid #e9d5ff';
+          hrBanner.innerHTML = `<b>🟣 Находится в отпуске/декрете (С заменой)</b><br>На её месте временно работает: <b>${x.replaced_by_full_name}</b>`;
+        } else if (x.hr_status_code !== 'active' && !x.has_replacement) {
+          hrBanner.style.display = 'block';
+          hrBanner.style.background = '#fee2e2'; hrBanner.style.color = '#991b1b'; hrBanner.style.border = '1px solid #fca5a5';
+          hrBanner.innerHTML = `<b>🔴 ⚠️ Внимание: Замена отсутствует!</b><br>Сотрудник находится в декрете/отпуске, но в штате филиала <b>отсутствует заменяющий человек</b>.`;
+        } else {
+          hrBanner.style.display = 'none';
+        }
+
+        // Efficiency score breakdown
+        const sc = x.efficiency_score || 0;
+        const bd = x.efficiency_breakdown || {};
+        document.getElementById('m-score-val').textContent = `⭐ ${sc} / 100 (${x.efficiency_grade || ''})`;
+        document.getElementById('m-sc-load').textContent = (bd.workload_pts || 0) + ' pt';
+        document.getElementById('m-sc-ops').textContent = (bd.ops_pts || 0) + ' pt';
+        document.getElementById('m-sc-speed').textContent = (bd.speed_pts || 0) + ' pt';
+        document.getElementById('m-sc-days').textContent = (bd.attendance_pts || 0) + ' pt';
 
         document.getElementById('m-hours').textContent = x.hours_str ? x.hours_str.replace('soat', 'ч').replace('min', 'мин') : (nf.format(x.operations_minutes) + ' мин');
         document.getElementById('m-mins-sub').textContent = `${nf.format(x.operations_minutes)} рабочих минут`;

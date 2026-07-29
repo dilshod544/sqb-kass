@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Импорт штата и статусов кассиров</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #14213a;
+      font: 14px Inter, Arial, sans-serif;
+      background: radial-gradient(circle at 10% 0, #e9d5ff, transparent 33%), #f4f7fb;
+    }
+    header {
+      height: 64px;
+      background: #ffffffd9;
+      border-bottom: 1px solid #e0e7f1;
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      gap: 10px;
+    }
+    header b { font-size: 17px; }
+    .back {
+      margin-left: auto;
+      color: #7c3aed;
+      text-decoration: none;
+      font-weight: 750;
+    }
+    .page {
+      width: min(1040px, calc(100% - 32px));
+      margin: 44px auto;
+    }
+    .hero {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .badge {
+      display: inline-block;
+      background: #f3e8ff;
+      color: #7c3aed;
+      padding: 7px 11px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .hero h1 {
+      font-size: 34px;
+      letter-spacing: -1px;
+      margin: 13px 0 9px;
+    }
+    .hero p {
+      color: #627188;
+      max-width: 680px;
+      margin: auto;
+      line-height: 1.6;
+    }
+    .box, .card {
+      background: #fff;
+      border: 1px solid #e1e8f2;
+      border-radius: 22px;
+      box-shadow: 0 13px 35px #1d31500d;
+    }
+    .box {
+      padding: 28px;
+      text-align: center;
+    }
+    .drop {
+      border: 2px dashed #c084fc;
+      background: #faf5ff;
+      border-radius: 17px;
+      padding: 38px 20px;
+      transition: .2s;
+    }
+    .drop.over {
+      border-color: #7c3aed;
+      background: #f3e8ff;
+    }
+    .drop i {
+      color: #7c3aed;
+      width: 38px;
+      height: 38px;
+    }
+    .drop h2 {
+      margin: 10px 0 6px;
+      font-size: 18px;
+    }
+    .drop p {
+      color: #65758b;
+      margin: 0 0 18px;
+    }
+    .choose {
+      display: inline-block;
+      background: #7c3aed;
+      color: #fff;
+      border-radius: 10px;
+      padding: 11px 17px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    .choose input { display: none; }
+    .file {
+      margin-top: 15px;
+      color: #52647d;
+      font-weight: 700;
+    }
+    .btn {
+      display: none;
+      margin: 18px auto 0;
+      background: #15915c;
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .result {
+      display: none;
+      text-align: left;
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      line-height: 1.55;
+    }
+    .result.ok {
+      display: block;
+      background: #ebfbf3;
+      color: #176442;
+      border: 1px solid #bdebd2;
+    }
+    .result.bad {
+      display: block;
+      background: #fff0f0;
+      color: #a42626;
+      border: 1px solid #facaca;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .card { padding: 21px; }
+    .card h3 {
+      margin: 0 0 11px;
+      font-size: 15px;
+    }
+    .card p, .card li {
+      color: #637188;
+      line-height: 1.55;
+    }
+    .schema {
+      font-size: 12px;
+      background: #faf5ff;
+      border-radius: 10px;
+      padding: 12px;
+      line-height: 1.8;
+    }
+    .schema b { color: #5b21b6; }
+    @media(max-width:700px) {
+      .grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 27px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <i data-lucide="users" style="color:#7c3aed"></i>
+    <b>Cashier HR Intelligence</b>
+    <a class="back" href="/dashboard/cashiers.html">← Аналитика кассиров</a>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <span class="badge">XLSX · СОСТОЯНИЕ И ШТАТ КАССИРОВ</span>
+      <h1>Импорт штата и статусов кассиров</h1>
+      <p>Загрузите отчёт <b>состояния кассиров</b>. Система распознает филиалы, должности, статусы (<code>мехнат.тат.</code>, <code>декрет2</code>, <code>вакт.</code>) и автоматически сопоставит замещающих сотрудников.</p>
+    </section>
+
+    <section class="box">
+      <div class="drop" id="drop">
+        <i data-lucide="upload-cloud"></i>
+        <h2>Перетащите Excel-файл штата сюда</h2>
+        <p>или выберите файл в формате <b>.xlsx</b></p>
+        <label class="choose">
+          Выбрать файл
+          <input id="file" type="file" accept=".xlsx">
+        </label>
+        <div class="file" id="filename">Файл ещё не выбран</div>
+      </div>
+      <button class="btn" id="submit" onclick="upload()">Импортировать статус штата →</button>
+      <div class="result" id="result"></div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h3>Что система определит</h3>
+        <ul>
+          <li><b>Филиалы</b> (заголовки блоков филиалов);</li>
+          <li><b>В отпуске</b> — отметки <code>(мехнат.тат.)</code>;</li>
+          <li><b>В декрете</b> — отметки <code>(декрет)</code> / <code>(декрет2)</code>;</li>
+          <li><b>Временные сотрудники</b> — отметки <code>(вакт.)</code>;</li>
+          <li><b>Связи замещения</b> — кто замещает временно отсутствующего сотрудника;</li>
+          <li><b>Отсутствие замены</b> — сотрудники в декрете/отпуске без заменяющего человека.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h3>Структура файла штата</h3>
+        <div class="schema">
+          <b>Колонка B:</b> Порядковый номер (1, 2, 3...)<br>
+          <b>Колонка C:</b> Должность (Universal kassir, Kassa mudiri...)<br>
+          <b>Колонка D:</b> ФИО сотрудника<br>
+          <b>Колонка E:</b> Отметка статуса: <code>(мехнат.тат.)</code>, <code>(декрет2)</code>, <code>(вакт.)</code>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    lucide.createIcons();
+    const base = location.origin.includes(':') ? location.origin : `${location.protocol}//${location.hostname}:8000`;
+    const f = document.getElementById('file');
+    const drop = document.getElementById('drop');
+    const out = document.getElementById('result');
+    const btn = document.getElementById('submit');
+
+    function select(file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        return show('bad', 'Нужен файл формата .xlsx. Выбран: ' + file.name);
+      }
+      f._chosen = file;
+      document.getElementById('filename').textContent = 'Выбран файл: ' + file.name;
+      btn.style.display = 'block';
+      out.className = 'result';
+      out.textContent = '';
+    }
+
+    f.onchange = e => select(e.target.files[0]);
+
+    ['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, x => {
+      x.preventDefault();
+      drop.classList.add('over');
+    }));
+
+    ['dragleave', 'drop'].forEach(e => drop.addEventListener(e, x => {
+      x.preventDefault();
+      drop.classList.remove('over');
+    }));
+
+    drop.addEventListener('drop', e => select(e.dataTransfer.files[0]));
+
+    function show(cls, text) {
+      out.className = 'result ' + cls;
+      out.innerHTML = text;
+    }
+
+    async function upload() {
+      let file = f._chosen || f.files[0];
+      if (!file) return show('bad', 'Сначала выберите Excel-файл штата.');
+      btn.disabled = true;
+      btn.textContent = 'Обрабатываем статус штата…';
+      try {
+        let fd = new FormData();
+        fd.append('file', file);
+        let r = await fetch(base + '/api/cashiers/import-status', { method: 'POST', body: fd });
+        let d = await r.json();
+        if (!r.ok) throw Error(d.detail || 'Ошибка сервера ' + r.status);
+        show('ok', `<b>Успешно импортирован штат: ${d.imported} сотрудников.</b><br>Файл: ${d.filename}. Все данные по декретам, отпускам и замещениям сопоставлены.<br><a href="/dashboard/cashiers.html" style="color:#176442;font-weight:bold">Открыть аналитику и статус кассиров →</a>`);
+      } catch (e) {
+        show('bad', '<b>Импорт штата не выполнен.</b><br>' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Импортировать статус штата →';
+      }
+    }
+  </script>
+</body>
+</html>

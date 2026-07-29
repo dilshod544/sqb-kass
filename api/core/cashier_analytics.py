@@ -9,7 +9,15 @@ from openpyxl.utils import get_column_letter
 from .db import _connect
 
 def norm(v):
-    return re.sub(r'[^a-zа-я0-9]+', ' ', str(v or '').lower().replace('қ', 'к').replace('ў', 'у')).strip()
+    if v is None:
+        return ''
+    s = str(v).lower()
+    cyr_map = {'қ': 'к', 'ў': 'у', 'ғ': 'г', 'ҳ': 'х', 'ё': 'е', 'ҷ': 'ч', 'ӣ': 'и'}
+    for src, dst in cyr_map.items():
+        s = s.replace(src, dst)
+    s = re.sub(r"['`′ʼʻʼ]", '', s)
+    s = re.sub(r'[^\w]+', ' ', s, flags=re.UNICODE)
+    return s.strip()
 
 def num(v):
     if v is None:
@@ -45,6 +53,8 @@ def init_cashier_tables():
     with _connect() as c:
         c.execute("CREATE TABLE IF NOT EXISTS cashier_imports (id INTEGER PRIMARY KEY AUTOINCREMENT,filename TEXT,imported_at TEXT NOT NULL,rows_count INTEGER NOT NULL,report_label TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS cashier_reports (id INTEGER PRIMARY KEY AUTOINCREMENT,import_id INTEGER NOT NULL REFERENCES cashier_imports(id) ON DELETE CASCADE,tab_number TEXT,full_name TEXT NOT NULL,position TEXT,days_worked REAL,operations_count REAL NOT NULL DEFAULT 0,operations_minutes REAL NOT NULL DEFAULT 0,bek_count REAL NOT NULL DEFAULT 0,bek_minutes REAL NOT NULL DEFAULT 0,front_count REAL NOT NULL DEFAULT 0,front_minutes REAL NOT NULL DEFAULT 0,metrics_json TEXT NOT NULL DEFAULT '{}')")
+        c.execute("CREATE TABLE IF NOT EXISTS cashier_status_imports (id INTEGER PRIMARY KEY AUTOINCREMENT,filename TEXT,imported_at TEXT NOT NULL,rows_count INTEGER NOT NULL)")
+        c.execute("CREATE TABLE IF NOT EXISTS cashier_statuses (id INTEGER PRIMARY KEY AUTOINCREMENT,import_id INTEGER NOT NULL REFERENCES cashier_status_imports(id) ON DELETE CASCADE,branch_name TEXT,position TEXT,full_name TEXT NOT NULL,status_code TEXT NOT NULL,status_label TEXT NOT NULL,raw_note TEXT,replacing_full_name TEXT,replaced_by_full_name TEXT,has_replacement INTEGER NOT NULL DEFAULT 0)")
 
 def parse_cashiers_xlsx(path: str | Path):
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -132,16 +142,159 @@ def save_cashier_import(filename, parsed):
                        }, ensure_ascii=False)))
     return {'import_id': iid, 'imported': len(parsed['records']), 'header_rows': parsed['header_rows']}
 
+def parse_cashier_status_xlsx(path: str | Path):
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb.active
+    all_rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+
+    if not all_rows:
+        raise ValueError('Excel-файл пуст.')
+
+    records = []
+    current_branch = 'Не указан'
+
+    for row in all_rows:
+        if not row or not any(v not in (None, '') for v in row):
+            continue
+
+        row_str = ' '.join(str(cell or '') for cell in row).strip()
+        n_row = norm(row_str)
+
+        if 'филиал' in n_row or 'buxoro' in n_row or 'markazi' in n_row or 'ofisi' in n_row:
+            for cell in row:
+                if cell and 'филиал' in str(cell).lower():
+                    current_branch = str(cell).strip()
+                    break
+            continue
+
+        get = lambda col_idx: row[col_idx - 1] if len(row) >= col_idx else None
+        pos = str(get(3) or '').strip()
+        name = str(get(4) or '').strip()
+        note = str(get(5) or '').strip()
+
+        if not name and pos and 'филиал' in pos.lower():
+            current_branch = pos
+            continue
+
+        n_name = norm(name)
+        if not name or len(name) < 4 or n_name in ('фиш', 'фио', 'ф и о', 'сони', 'минут', 'jami', 'итого'):
+            continue
+
+        records.append({
+            'branch_name': current_branch,
+            'position': pos,
+            'full_name': name,
+            'raw_note': note,
+            'status_code': 'active',
+            'status_label': 'Работает',
+            'replacing_full_name': None,
+            'replaced_by_full_name': None,
+            'has_replacement': 0
+        })
+
+    if not records:
+        raise ValueError('Не найдено ни одной строки с ФИО кассиров в реестре штата.')
+
+    # Sequential correlation pass to identify replacement pairs (вакт. -> декрет/мехнат.тат.)
+    for i, r in enumerate(records):
+        n_note = norm(r['raw_note'])
+        if 'вакт' in n_note or 'vakt' in n_note:
+            r['status_code'] = 'temporary'
+            if i + 1 < len(records):
+                next_r = records[i + 1]
+                next_note = norm(next_r['raw_note'])
+                if 'декрет' in next_note or 'тат' in next_note or 'отпуск' in next_note:
+                    r['replacing_full_name'] = next_r['full_name']
+                    next_r['replaced_by_full_name'] = r['full_name']
+                    next_r['has_replacement'] = 1
+
+    for r in records:
+        n_note = norm(r['raw_note'])
+        if r['status_code'] == 'temporary':
+            r['status_label'] = f"Временный (замещает {r['replacing_full_name']})" if r['replacing_full_name'] else 'Временный сотрудник'
+        elif 'декрет' in n_note:
+            r['status_code'] = 'maternity'
+            r['status_label'] = f"В декрете (замещает {r['replaced_by_full_name']})" if r['has_replacement'] else 'В декрете (без замены)'
+        elif 'тат' in n_note or 'отпуск' in n_note:
+            r['status_code'] = 'vacation'
+            r['status_label'] = f"В отпуске (замещает {r['replaced_by_full_name']})" if r['has_replacement'] else 'В отпуске (без замены)'
+        else:
+            r['status_code'] = 'active'
+            r['status_label'] = 'Работает'
+
+    return {'records': records, 'total_rows': len(all_rows)}
+
+def save_cashier_status_import(filename, parsed):
+    init_cashier_tables()
+    with _connect() as c:
+        iid = c.execute('INSERT INTO cashier_status_imports(filename,imported_at,rows_count) VALUES(?,?,?)',
+                        (filename, datetime.now(timezone.utc).isoformat(), len(parsed['records']))).lastrowid
+        for r in parsed['records']:
+            c.execute('INSERT INTO cashier_statuses(import_id,branch_name,position,full_name,status_code,status_label,raw_note,replacing_full_name,replaced_by_full_name,has_replacement) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                      (iid, r.get('branch_name'), r.get('position'), r['full_name'], r['status_code'], r['status_label'], r.get('raw_note'), r.get('replacing_full_name'), r.get('replaced_by_full_name'), r['has_replacement']))
+    return {'import_id': iid, 'imported': len(parsed['records'])}
+
 def cashier_role(row):
+    pos = norm(row.get('position') or '')
+    if 'универсал' in pos or 'universal' in pos or 'назоратчи' in pos or 'nazoratchi' in pos or 'контролер' in pos:
+        return 'universal'
     b = float(row.get('bek_count', 0) or 0)
     f = float(row.get('front_count', 0) or 0)
-    if f > b:
+    if f >= b:
         return 'front'
-    elif b > f:
-        return 'back'
-    elif b > 0 and f > 0:
-        return 'universal'
-    return 'universal' if float(row.get('operations_count', 0) or 0) > 0 else 'unknown'
+    return 'back'
+
+def compute_efficiency_score(x):
+    lp = x.get('load_percent', 0)
+    diff = abs(float(x.get('load_difference', 0) or 0))
+
+    # 1. Workload Score (max 35 pts): High load without errors gets full score
+    if lp >= 75:
+        s_load = 35.0
+    else:
+        s_load = round(35.0 * (lp / 75.0), 1)
+
+    # Discrepancy Penalty: Apply penalty ONLY if there is actual recorded error/discrepancy (load_difference != 0)
+    if diff > 0:
+        s_load = max(0.0, round(s_load - min(15.0, diff * 5.0), 1))
+
+    ops = x.get('operations_count', 0)
+    s_ops = round(min(30.0, 30.0 * (ops / 150.0)), 1) if ops else 0.0
+
+    sec = x.get('avg_seconds_per_operation', 0)
+    if 0 < sec <= 180:
+        s_speed = 20.0
+    elif sec > 180:
+        s_speed = round(max(5.0, 20.0 - (sec - 180) * 0.05), 1)
+    else:
+        s_speed = 0.0
+
+    days = x.get('days_worked', 0)
+    s_days = round(min(15.0, 15.0 * (days / 22.0)), 1)
+
+    total_score = round(s_load + s_ops + s_speed + s_days, 1)
+    if total_score >= 85:
+        grade = 'Top Performer'
+    elif total_score >= 70:
+        grade = 'Optimal'
+    elif total_score >= 50:
+        grade = 'Average'
+    else:
+        grade = 'Low Load'
+
+    return {
+        'efficiency_score': total_score,
+        'efficiency_grade': grade,
+        'efficiency_breakdown': {
+            'workload_pts': s_load,
+            'ops_pts': s_ops,
+            'speed_pts': s_speed,
+            'attendance_pts': s_days,
+            'has_discrepancy': diff > 0,
+            'discrepancy_value': diff
+        }
+    }
 
 def _enrich(x, detail=False):
     x['avg_seconds_per_operation'] = round(x['operations_minutes'] * 60 / x['operations_count'], 1) if x.get('operations_count') else 0
@@ -149,27 +302,44 @@ def _enrich(x, detail=False):
     raw = json.loads(x.get('metrics_json') or '{}')
     ops = raw.get('operations', {})
     x['employee_number'] = raw.get('employee_number', '')
-    x['load_percent'] = raw.get('load_percent', 0)
+
+    lp = float(raw.get('load_percent') or 0)
+    if 0 < lp <= 1.0:
+        lp = round(lp * 100, 1)
+    elif lp == 0 and x.get('days_worked') and x.get('operations_minutes'):
+        lp = round((x['operations_minutes'] / (x['days_worked'] * 480)) * 100, 1)
+    x['load_percent'] = round(lp, 1)
+
     x['load_difference'] = raw.get('load_difference', 0)
     x['cashier_type'] = cashier_role(x)
     total_ops = x.get('operations_count', 0) or 1
-    if detail:
-        x['hours_worked'] = round(x.get('operations_minutes', 0) / 60, 1)
-        mins = int(x.get('operations_minutes', 0))
-        x['hours_str'] = f"{mins // 60} ч {mins % 60} мин"
-        x['days_worked_pct'] = round(x.get('days_worked', 0) / 22 * 100, 1)
-        x['metrics'] = [{
-            'name': n,
-            'section': 'БЭК-операции' if n in BACK_GROUPS else 'ФРОНТ-операции' if n in FRONT_GROUPS else 'Прочее',
-            'count': v.get('count', 0),
-            'minutes': v.get('minutes', 0),
-            'pct': round(v.get('count', 0) / total_ops * 100, 1)
-        } for n, v in ops.items()]
-        x['metrics'].sort(key=lambda m: m['count'], reverse=True)
-        x['top_direction'] = x['metrics'][0]['name'] if x['metrics'] else '—'
+
+    x['bek_pct'] = round((x.get('bek_count', 0) / total_ops) * 100, 1)
+    x['front_pct'] = round((x.get('front_count', 0) / total_ops) * 100, 1)
+    x['days_worked_pct'] = round((x.get('days_worked', 0) / 22) * 100, 1)
+
+    eff = compute_efficiency_score(x)
+    x['efficiency_score'] = eff['efficiency_score']
+    x['efficiency_grade'] = eff['efficiency_grade']
+    x['efficiency_breakdown'] = eff['efficiency_breakdown']
+
+    x['hours_worked'] = round(x.get('operations_minutes', 0) / 60, 1)
+    mins = int(x.get('operations_minutes', 0))
+    x['hours_str'] = f"{mins // 60} ч {mins % 60} мин"
+
+    x['metrics'] = [{
+        'name': n,
+        'section': 'БЭК-операции' if n in BACK_GROUPS else 'ФРОНТ-операции' if n in FRONT_GROUPS else 'Прочее',
+        'count': v.get('count', 0),
+        'minutes': v.get('minutes', 0),
+        'pct': round(v.get('count', 0) / total_ops * 100, 1)
+    } for n, v in ops.items()]
+    x['metrics'].sort(key=lambda m: m['count'], reverse=True)
+    x['top_direction'] = x['metrics'][0]['name'] if x['metrics'] else '—'
     return x, ops
 
-def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=None, position=None):
+def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=None, position=None, status=None):
+    init_cashier_tables()
     with _connect() as c:
         if import_id is None:
             q = c.execute('SELECT id FROM cashier_imports ORDER BY id DESC LIMIT 1').fetchone()
@@ -179,8 +349,73 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         info = dict(c.execute('SELECT * FROM cashier_imports WHERE id=?', (import_id,)).fetchone())
         rows = [dict(z) for z in c.execute('SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC', (import_id,))]
 
+        # Fetch latest cashier statuses if available (File 2)
+        st_import = c.execute('SELECT id FROM cashier_status_imports ORDER BY id DESC LIMIT 1').fetchone()
+        status_map = {}
+        status_map_2word = {}
+        unmatched_statuses = []
+        if st_import:
+            st_rows = c.execute('SELECT * FROM cashier_statuses WHERE import_id=?', (st_import['id'],)).fetchall()
+            for s in st_rows:
+                s_dict = dict(s)
+                n_fn = norm(s_dict['full_name'])
+                status_map[n_fn] = s_dict
+                words = n_fn.split()
+                if len(words) >= 2:
+                    status_map_2word[f"{words[0]} {words[1]}"] = s_dict
+                unmatched_statuses.append(s_dict)
+
+    matched_status_names = set()
     for x in rows:
         _enrich(x)
+        n_fn = norm(x['full_name'])
+        words = n_fn.split()
+        st = status_map.get(n_fn)
+        if not st and len(words) >= 2:
+            st = status_map_2word.get(f"{words[0]} {words[1]}")
+
+        if st:
+            matched_status_names.add(norm(st['full_name']))
+            x['hr_status_code'] = st['status_code']
+            x['hr_status_label'] = st['status_label']
+            x['branch_name'] = st.get('branch_name', '')
+            x['replacing_full_name'] = st.get('replacing_full_name')
+            x['replaced_by_full_name'] = st.get('replaced_by_full_name')
+            x['has_replacement'] = st.get('has_replacement', 0)
+        else:
+            x['hr_status_code'] = 'active'
+            x['hr_status_label'] = 'Работает'
+            x['branch_name'] = ''
+            x['replacing_full_name'] = None
+            x['replaced_by_full_name'] = None
+            x['has_replacement'] = 1
+
+    # Include HR status employees who performed 0 operations (e.g. absent on maternity leave)
+    for st in unmatched_statuses:
+        if norm(st['full_name']) not in matched_status_names:
+            dummy_row = {
+                'id': 900000 + st['id'],
+                'import_id': import_id,
+                'tab_number': '—',
+                'full_name': st['full_name'],
+                'position': st.get('position') or 'Кассир',
+                'days_worked': 0,
+                'operations_count': 0,
+                'operations_minutes': 0,
+                'bek_count': 0,
+                'bek_minutes': 0,
+                'front_count': 0,
+                'front_minutes': 0,
+                'metrics_json': '{}',
+                'hr_status_code': st['status_code'],
+                'hr_status_label': st['status_label'],
+                'branch_name': st.get('branch_name', ''),
+                'replacing_full_name': st.get('replacing_full_name'),
+                'replaced_by_full_name': st.get('replaced_by_full_name'),
+                'has_replacement': st.get('has_replacement', 0),
+            }
+            _enrich(dummy_row)
+            rows.append(dummy_row)
 
     all_rows = list(rows)
 
@@ -200,16 +435,27 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
     if role in ('back', 'front', 'universal'):
         rows = [x for x in rows if x['cashier_type'] == role]
 
+    if status and str(status).strip():
+        st_q = str(status).strip().lower()
+        if st_q == 'no_replacement':
+            rows = [x for x in rows if x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity')]
+        elif st_q in ('active', 'vacation', 'maternity', 'temporary'):
+            rows = [x for x in rows if x.get('hr_status_code') == st_q]
+
     if position and str(position).strip():
         pos_q = str(position).strip().lower()
         rows = [x for x in rows if (x.get('position') or '').strip().lower() == pos_q]
 
     if search and str(search).strip():
-        q = norm(search)
-        rows = [
-            x for x in rows
-            if q in norm(x.get('full_name', '')) or q in norm(x.get('position', '')) or q in norm(x.get('tab_number', '')) or q in norm(x.get('employee_number', ''))
-        ]
+        q_words = norm(search).split()
+        if q_words:
+            rows = [
+                x for x in rows
+                if all(
+                    w in norm(f"{x.get('full_name', '')} {x.get('position', '')} {x.get('tab_number', '')} {x.get('employee_number', '')} {x.get('hr_status_label', '')} {x.get('branch_name', '')}")
+                    for w in q_words
+                )
+            ]
 
     cats = {}
     allowed = BACK_GROUPS if role == 'back' else FRONT_GROUPS if role == 'front' else None
@@ -236,6 +482,10 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
 
     total_ops = sum(x['operations_count'] for x in rows)
     total_min = sum(x['operations_minutes'] for x in rows)
+    bek_tot = sum(x['bek_count'] for x in rows)
+    front_tot = sum(x['front_count'] for x in rows)
+    tot_load = sum(x['load_percent'] for x in rows)
+    tot_eff = sum(x.get('efficiency_score', 0) for x in rows)
 
     summary = {
         'cashiers': total,
@@ -243,11 +493,20 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         'minutes': round(total_min),
         'hours': round(total_min / 60, 1),
         'avg_seconds_per_operation': round(total_min * 60 / total_ops, 1) if total_ops else 0,
-        'bek_operations': round(sum(x['bek_count'] for x in rows)),
-        'front_operations': round(sum(x['front_count'] for x in rows)),
+        'avg_load_percent': round(tot_load / total, 1) if total else 0,
+        'avg_efficiency_score': round(tot_eff / total, 1) if total else 0,
+        'bek_operations': round(bek_tot),
+        'bek_pct': round(bek_tot / total_ops * 100, 1) if total_ops else 0,
+        'front_operations': round(front_tot),
+        'front_pct': round(front_tot / total_ops * 100, 1) if total_ops else 0,
         'back_cashiers': sum(x['cashier_type'] == 'back' for x in all_rows),
         'front_cashiers': sum(x['cashier_type'] == 'front' for x in all_rows),
         'universal_cashiers': sum(x['cashier_type'] == 'universal' for x in all_rows),
+        'active_cashiers': sum(x.get('hr_status_code') == 'active' for x in all_rows),
+        'vacation_cashiers': sum(x.get('hr_status_code') == 'vacation' for x in all_rows),
+        'maternity_cashiers': sum(x.get('hr_status_code') == 'maternity' for x in all_rows),
+        'temporary_cashiers': sum(x.get('hr_status_code') == 'temporary' for x in all_rows),
+        'no_replacement_cashiers': sum(x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity') for x in all_rows),
         'active_filter': role or 'all'
     }
 
@@ -270,9 +529,33 @@ def cashier_detail(report_id):
         if not r:
             return None
         peers = c.execute('SELECT operations_count FROM cashier_reports WHERE import_id=?', (r['import_id'],)).fetchall()
-    
+        
+        st_import = c.execute('SELECT id FROM cashier_status_imports ORDER BY id DESC LIMIT 1').fetchone()
+        st_info = None
+        if st_import:
+            st = c.execute('SELECT * FROM cashier_statuses WHERE import_id=? AND (full_name=? OR lower(full_name)=lower(?))',
+                           (st_import['id'], r['full_name'], r['full_name'])).fetchone()
+            if st:
+                st_info = dict(st)
+
     x, _ = _enrich(dict(r), True)
     tot_peers = len(peers) or 1
     x['rank_by_operations'] = 1 + sum(p['operations_count'] > x['operations_count'] for p in peers)
     x['percentile'] = round(100 * sum(p['operations_count'] <= x['operations_count'] for p in peers) / tot_peers, 1)
+
+    if st_info:
+        x['hr_status_code'] = st_info['status_code']
+        x['hr_status_label'] = st_info['status_label']
+        x['branch_name'] = st_info.get('branch_name', '')
+        x['replacing_full_name'] = st_info.get('replacing_full_name')
+        x['replaced_by_full_name'] = st_info.get('replaced_by_full_name')
+        x['has_replacement'] = st_info.get('has_replacement', 0)
+    else:
+        x['hr_status_code'] = 'active'
+        x['hr_status_label'] = 'Работает'
+        x['branch_name'] = ''
+        x['replacing_full_name'] = None
+        x['replaced_by_full_name'] = None
+        x['has_replacement'] = 1
+
     return x

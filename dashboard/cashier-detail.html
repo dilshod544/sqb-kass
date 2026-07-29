@@ -133,7 +133,9 @@
         <thead>
           <tr>
             <th>Операция</th>
+            <th>Раздел</th>
             <th>Количество</th>
+            <th>Доля (%)</th>
             <th>Минут</th>
           </tr>
         </thead>
@@ -157,19 +159,38 @@
           return r.json();
         })
         .then(x => {
+          let statusInfoStr = `Статус: ${x.hr_status_label || 'Работает'}`;
+          if (x.replacing_full_name) {
+            statusInfoStr += ` (Временно замещает: ${x.replacing_full_name})`;
+          } else if (x.replaced_by_full_name) {
+            statusInfoStr += ` (Её замещает: ${x.replaced_by_full_name})`;
+          } else if (x.hr_status_code !== 'active' && !x.has_replacement) {
+            statusInfoStr += ` ⚠️ (Замена отсутствует!)`;
+          }
+
           document.title = x.full_name + ' — аналитика';
           document.getElementById('name').textContent = x.full_name;
-          document.getElementById('meta').textContent = 'Углублённая аналитика кассира · ' + (x.filename || '');
-          document.getElementById('sub').textContent = `№ сотрудника: ${x.employee_number || '—'} · Табель: ${x.tab_number || '—'} · ${x.position || '—'} · рабочих дней: ${x.days_worked || 0} · Нагрузка: ${x.load_percent || 0}% · Разница: ${x.load_difference || 0}`;
+          document.getElementById('meta').textContent = 'Углублённая аналитика кассира · ' + (x.filename || '') + (x.branch_name ? ` · ${x.branch_name}` : '');
+          document.getElementById('sub').innerHTML = `<b>${statusInfoStr}</b><br>№ сотрудника: ${x.employee_number || '—'} · Табель: ${x.tab_number || '—'} · ${x.position || '—'} · рабочих дней: ${x.days_worked || 0} (${x.days_worked_pct || 0}% от нормы) · Нагрузка: ${x.load_percent || 0}%`;
           document.getElementById('rank').textContent = '#' + x.rank_by_operations + ' / ' + (x.percentile ? Math.round(x.percentile) : 0) + ' перцентиль';
           document.getElementById('ops').textContent = nf.format(x.operations_count);
           document.getElementById('perday').textContent = x.operations_per_day;
           document.getElementById('speed').textContent = x.avg_seconds_per_operation + ' сек';
           
+          const score = x.efficiency_score || 0;
+          const scoreBg = score >= 85 ? 'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0' :
+                          score >= 70 ? 'background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd' :
+                          score >= 50 ? 'background:#fef3c7;color:#b45309;border:1px solid #fde68a' :
+                          'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5';
+
           document.getElementById('core').innerHTML = `
+            <tr><th>Балл Samaradorlik</th><td><span style="font-weight:800;padding:3px 10px;border-radius:8px;${scoreBg}">⭐ ${score} / 100 (${x.efficiency_grade || ''})</span></td></tr>
+            <tr><th>HR Статус</th><td><b>${x.hr_status_label || 'Работает'}</b> ${x.replacing_full_name ? '<br><small class="muted">Замещает: ' + x.replacing_full_name + '</small>' : x.replaced_by_full_name ? '<br><small class="muted">Её замещает: ' + x.replaced_by_full_name + '</small>' : (!x.has_replacement && x.hr_status_code !== 'active') ? '<br><small style="color:#dc2626;font-weight:bold">⚠️ Замена отсутствует</small>' : ''}</td></tr>
+            <tr><th>Филиал</th><td>${x.branch_name || 'Не указан'}</td></tr>
             <tr><th>Рабочих минут</th><td>${nf.format(x.operations_minutes)} (${x.hours_str || ''})</td></tr>
-            <tr><th>БЭК</th><td>${nf.format(x.bek_count)} операций / ${nf.format(x.bek_minutes)} минут</td></tr>
-            <tr><th>ФРОНТ</th><td>${nf.format(x.front_count)} операций / ${nf.format(x.front_minutes)} минут</td></tr>
+            <tr><th>Нагрузка %</th><td><b style="color:${x.load_percent > 100 ? '#dc2626' : '#16a34a'}">${x.load_percent || 0}%</b></td></tr>
+            <tr><th>БЭК-операции</th><td>${nf.format(x.bek_count)} (${x.bek_pct || 0}%) / ${nf.format(x.bek_minutes)} минут</td></tr>
+            <tr><th>ФРОНТ-операции</th><td>${nf.format(x.front_count)} (${x.front_pct || 0}%) / ${nf.format(x.front_minutes)} минут</td></tr>
             <tr><th>Среднее время</th><td>${x.avg_seconds_per_operation} сек. на операцию</td></tr>
           `;
 
@@ -177,10 +198,12 @@
           document.getElementById('metrics').innerHTML = m_list.map(m => `
             <tr>
               <td><b>${m.name}</b></td>
-              <td>${nf.format(m.count)}</td>
-              <td>${nf.format(m.minutes)}</td>
+              <td><span class="muted">${m.section}</span></td>
+              <td><b>${nf.format(m.count)}</b></td>
+              <td><b style="color:#2864ce">${m.pct}%</b></td>
+              <td>${nf.format(m.minutes)} мин</td>
             </tr>
-          `).join('') || '<tr><td colspan="3">Дополнительных операций нет</td></tr>';
+          `).join('') || '<tr><td colspan="5">Дополнительных операций нет</td></tr>';
 
           let m = m_list.slice(0, 10);
           new Chart(document.getElementById('chart'), {

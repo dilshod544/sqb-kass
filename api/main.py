@@ -48,7 +48,10 @@ from core.db import (
 )
 from core.incassation_router import build_regional_routes
 from core.importer import parse_xlsx, REQUIRED_FIELDS, parse_branches_xlsx
-from core.cashier_analytics import parse_cashiers_xlsx, save_cashier_import, cashier_analytics, cashier_detail
+from core.cashier_analytics import (
+    parse_cashiers_xlsx, save_cashier_import, cashier_analytics, cashier_detail,
+    parse_cashier_status_xlsx, save_cashier_status_import
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -530,6 +533,24 @@ async def import_cashiers(file: UploadFile = File(..., description="Excel-отч
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+@app.post("/api/cashiers/import-status", summary="Импорт реестра штата и статусов кассиров из XLSX")
+async def import_cashier_status(file: UploadFile = File(..., description="Excel-реестр штата и статусов кассиров")):
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(400, "Ожидается .xlsx файл")
+    tmp_dir = tempfile.mkdtemp(prefix="cashier_status_import_")
+    tmp_path = os.path.join(tmp_dir, file.filename)
+    try:
+        with open(tmp_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        try:
+            parsed = parse_cashier_status_xlsx(tmp_path)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return {"ok": True, "filename": file.filename, **save_cashier_status_import(file.filename, parsed)}
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 @app.get("/api/cashiers/analytics", summary="KPI, рейтинг и структура операций кассиров")
 async def get_cashier_analytics(
     import_id: Optional[int] = Query(None),
@@ -538,8 +559,9 @@ async def get_cashier_analytics(
     role: Optional[str] = Query(None, pattern="^(back|front|universal)$"),
     search: Optional[str] = Query(None, description="Поиск по ФИО, должности, табелю, номеру"),
     position: Optional[str] = Query(None, description="Фильтр по должности"),
+    status: Optional[str] = Query(None, description="Фильтр по HR статусу: active | vacation | maternity | temporary | no_replacement"),
 ):
-    return cashier_analytics(import_id, page, page_size, role, search, position)
+    return cashier_analytics(import_id, page, page_size, role, search, position, status)
 
 
 @app.get("/api/cashiers/{report_id}", summary="Углублённая аналитика одного кассира")
