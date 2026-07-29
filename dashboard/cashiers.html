@@ -427,7 +427,9 @@
     const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
     function destroy() {
-      charts.forEach(x => x.destroy());
+      charts.forEach(x => {
+        if (x) { try { x.destroy(); } catch(e) {} }
+      });
       charts = [];
     }
 
@@ -468,11 +470,11 @@
     function drawTop(labels, data) {
       const ctx = document.getElementById('top');
       if (!ctx) return;
-      const topChart = charts.find(c => c.canvas.id === 'top');
+      const topChart = charts.find(c => c && c.canvas && c.canvas.id === 'top');
       if (topChart) {
-        topChart.destroy();
-        charts = charts.filter(c => c.canvas.id !== 'top');
+        try { topChart.destroy(); } catch(e) {}
       }
+      charts = charts.filter(c => c && c.canvas && c.canvas.id !== 'top');
       charts.push(new Chart(ctx, {
         type: 'bar',
         data: {
@@ -495,11 +497,11 @@
     function drawCats(categories) {
       const ctx = document.getElementById('cats');
       if (!ctx) return;
-      const catChart = charts.find(c => c.canvas.id === 'cats');
+      const catChart = charts.find(c => c && c.canvas && c.canvas.id === 'cats');
       if (catChart) {
-        catChart.destroy();
-        charts = charts.filter(c => c.canvas.id !== 'cats');
+        try { catChart.destroy(); } catch(e) {}
       }
+      charts = charts.filter(c => c && c.canvas && c.canvas.id !== 'cats');
       const labels = categories.map(x => `${x.name} (${x.pct}%)`);
       const data = categories.map(x => x.count);
       const colors = ['#2864ce','#4e8aec','#11a879','#f2aa37','#8b5cf6','#e95c73','#38bdf8','#94a3b8'];
