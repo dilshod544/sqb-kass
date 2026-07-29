@@ -566,6 +566,42 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
     }
 
 def cashier_detail(report_id):
+    init_cashier_tables()
+    if report_id >= 900000:
+        st_id = report_id - 900000
+        with _connect() as c:
+            st = c.execute('SELECT * FROM cashier_statuses WHERE id=?', (st_id,)).fetchone()
+            if not st:
+                return None
+            st_info = dict(st)
+            r = {
+                'id': report_id,
+                'import_id': 0,
+                'tab_number': '—',
+                'full_name': st_info['full_name'],
+                'position': st_info.get('position') or 'Кассир',
+                'days_worked': 0,
+                'operations_count': 0,
+                'operations_minutes': 0,
+                'bek_count': 0,
+                'bek_minutes': 0,
+                'front_count': 0,
+                'front_minutes': 0,
+                'metrics_json': '{}',
+                'filename': 'Реестр штата',
+                'imported_at': datetime.now(timezone.utc).isoformat()
+            }
+        x, _ = _enrich(dict(r), True)
+        x['rank_by_operations'] = '—'
+        x['percentile'] = 0
+        x['hr_status_code'] = st_info['status_code']
+        x['hr_status_label'] = st_info['status_label']
+        x['branch_name'] = st_info.get('branch_name', '')
+        x['replacing_full_name'] = st_info.get('replacing_full_name')
+        x['replaced_by_full_name'] = st_info.get('replaced_by_full_name')
+        x['has_replacement'] = st_info.get('has_replacement', 0)
+        return x
+
     with _connect() as c:
         r = c.execute('SELECT r.*, i.filename, i.imported_at FROM cashier_reports r JOIN cashier_imports i ON i.id=r.import_id WHERE r.id=?', (report_id,)).fetchone()
         if not r:

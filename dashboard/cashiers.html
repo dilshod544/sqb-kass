@@ -614,11 +614,15 @@
         document.getElementById('chart-top-title').textContent = `Топ 10 кассиров${posLabel}`;
         document.getElementById('chart-cats-title').textContent = `Структура операций (%) ${filterLabel}`;
 
-        let top = d.cashiers.slice(0, 10);
-        drawTop(top.map(x => (x.full_name || '').split(' ').slice(0, 2).join(' ')), top.map(x => x.operations_count));
+        try {
+          let top = d.cashiers.slice(0, 10);
+          drawTop(top.map(x => (x.full_name || '').split(' ').slice(0, 2).join(' ')), top.map(x => x.operations_count));
+        } catch(e) { console.warn('Top chart render error:', e); }
 
-        let c = d.categories.slice(0, 8);
-        drawCats(c);
+        try {
+          let c = d.categories.slice(0, 8);
+          drawCats(c);
+        } catch(e) { console.warn('Cats chart render error:', e); }
 
         currentPage = d.page || 1;
         totalPages = d.total_pages || 1;
