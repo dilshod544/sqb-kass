@@ -161,33 +161,52 @@ def parse_cashier_status_xlsx(path: str | Path):
         row_str = ' '.join(str(cell or '') for cell in row).strip()
         n_row = norm(row_str)
 
-        if 'филиал' in n_row or 'buxoro' in n_row or 'markazi' in n_row or 'ofisi' in n_row:
+        if 'филиал' in n_row or 'buxoro' in n_row or 'markazi' in n_row or 'ofisi' in n_row or 'бхм' in n_row or 'бхо' in n_row:
             for cell in row:
-                if cell and 'филиал' in str(cell).lower():
+                if cell and any(w in str(cell).lower() for w in ('филиал', 'бхм', 'бхо', 'центр', 'офис')):
                     current_branch = str(cell).strip()
                     break
             continue
 
+        # Extract values safely across columns B (2), C (3), D (4), E (5)
         get = lambda col_idx: row[col_idx - 1] if len(row) >= col_idx else None
-        pos = str(get(3) or '').strip()
-        name = str(get(4) or '').strip()
-        note = str(get(5) or '').strip()
+        c_val = str(get(3) or '').strip()
+        d_val = str(get(4) or '').strip()
+        e_val = str(get(5) or '').strip()
 
-        if not name and pos and 'филиал' in pos.lower():
-            current_branch = pos
-            continue
+        # Identify name vs position vs note dynamically
+        pos = c_val
+        name = d_val
+        note = e_val
+
+        # If name is in Column C and Column D is empty/note
+        if not name and len(c_val) >= 4 and not norm(c_val) in ('фиш', 'фио', 'ф и о', 'сони', 'минут'):
+            name = c_val
+            pos = 'Кассир'
 
         n_name = norm(name)
-        if not name or len(name) < 4 or n_name in ('фиш', 'фио', 'ф и о', 'сони', 'минут', 'jami', 'итого'):
+        n_pos = norm(pos)
+        full_text = f"{pos} {name} {note}"
+        n_full = norm(full_text)
+
+        if not name or len(name) < 3 or n_name in ('фиш', 'фио', 'ф и о', 'сони', 'минут', 'jami', 'итого', 'номер', '№'):
             continue
+
+        # Check for VACANT position
+        is_vacant = 'вакант' in n_name or 'vakant' in n_name or 'вакант' in n_full
+        if is_vacant:
+            name = 'ВАКАНТ'
+            raw_status = 'vacant'
+        else:
+            raw_status = 'active'
 
         records.append({
             'branch_name': current_branch,
             'position': pos,
             'full_name': name,
-            'raw_note': note,
-            'status_code': 'active',
-            'status_label': 'Работает',
+            'raw_note': note if note else full_text,
+            'status_code': raw_status,
+            'status_label': '⚪ Вакант' if is_vacant else 'Работает',
             'replacing_full_name': None,
             'replaced_by_full_name': None,
             'has_replacement': 0
@@ -196,27 +215,40 @@ def parse_cashier_status_xlsx(path: str | Path):
     if not records:
         raise ValueError('Не найдено ни одной строки с ФИО кассиров в реестре штата.')
 
-    # Sequential correlation pass to identify replacement pairs (вакт. -> декрет/мехнат.тат.)
+    # Smart Correlation Pass: match temporary employees (вакт.) with adjacent absent employees (декрет / мехнат.тат.)
     for i, r in enumerate(records):
-        n_note = norm(r['raw_note'])
-        if 'вакт' in n_note or 'vakt' in n_note:
+        if r['status_code'] == 'vacant':
+            continue
+        n_text = norm(f"{r['position']} {r['full_name']} {r['raw_note']}")
+        if 'вакт' in n_text or 'vakt' in n_text:
             r['status_code'] = 'temporary'
-            if i + 1 < len(records):
-                next_r = records[i + 1]
-                next_note = norm(next_r['raw_note'])
-                if 'декрет' in next_note or 'тат' in next_note or 'отпуск' in next_note:
-                    r['replacing_full_name'] = next_r['full_name']
-                    next_r['replaced_by_full_name'] = r['full_name']
-                    next_r['has_replacement'] = 1
+            # Look at adjacent rows (+1, -1, +2, -2) in same branch
+            candidates = []
+            for delta in (1, -1, 2, -2):
+                idx = i + delta
+                if 0 <= idx < len(records):
+                    cand = records[idx]
+                    cand_text = norm(f"{cand['position']} {cand['full_name']} {cand['raw_note']}")
+                    if any(w in cand_text for w in ('декрет', 'тат', 'отпуск')) and not cand.get('has_replacement'):
+                        candidates.append((abs(delta), cand))
+            if candidates:
+                candidates.sort(key=lambda x: x[0])
+                target = candidates[0][1]
+                r['replacing_full_name'] = target['full_name']
+                target['replaced_by_full_name'] = r['full_name']
+                target['has_replacement'] = 1
 
     for r in records:
-        n_note = norm(r['raw_note'])
+        if r['status_code'] == 'vacant':
+            r['status_label'] = '⚪ Вакант (Свободная ставка)'
+            continue
+        n_text = norm(f"{r['position']} {r['full_name']} {r['raw_note']}")
         if r['status_code'] == 'temporary':
             r['status_label'] = f"Временный (замещает {r['replacing_full_name']})" if r['replacing_full_name'] else 'Временный сотрудник'
-        elif 'декрет' in n_note:
+        elif 'декрет' in n_text:
             r['status_code'] = 'maternity'
             r['status_label'] = f"В декрете (замещает {r['replaced_by_full_name']})" if r['has_replacement'] else 'В декрете (без замены)'
-        elif 'тат' in n_note or 'отпуск' in n_note:
+        elif 'тат' in n_text or 'отпуск' in n_text:
             r['status_code'] = 'vacation'
             r['status_label'] = f"В отпуске (замещает {r['replaced_by_full_name']})" if r['has_replacement'] else 'В отпуске (без замены)'
         else:
@@ -448,7 +480,7 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         st_q = str(status).strip().lower()
         if st_q == 'no_replacement':
             rows = [x for x in rows if x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity')]
-        elif st_q in ('active', 'vacation', 'maternity', 'temporary'):
+        elif st_q in ('active', 'vacation', 'maternity', 'temporary', 'vacant'):
             rows = [x for x in rows if x.get('hr_status_code') == st_q]
 
     if position and str(position).strip():
@@ -461,7 +493,7 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
             rows = [
                 x for x in rows
                 if all(
-                    w in norm(f"{x.get('full_name', '')} {x.get('position', '')} {x.get('tab_number', '')} {x.get('employee_number', '')} {x.get('hr_status_label', '')} {x.get('branch_name', '')}")
+                    w in norm(f"{x.get('full_name', '')} {x.get('position', '')} {x.get('tab_number', '')} {x.get('employee_number', '')} {x.get('hr_status_label', '')} {x.get('branch_name', '')} {x.get('raw_note', '')}")
                     for w in q_words
                 )
             ]
@@ -515,6 +547,7 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         'vacation_cashiers': sum(x.get('hr_status_code') == 'vacation' for x in all_rows),
         'maternity_cashiers': sum(x.get('hr_status_code') == 'maternity' for x in all_rows),
         'temporary_cashiers': sum(x.get('hr_status_code') == 'temporary' for x in all_rows),
+        'vacant_positions': sum(x.get('hr_status_code') == 'vacant' for x in all_rows),
         'no_replacement_cashiers': sum(x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity') for x in all_rows),
         'active_filter': role or 'all'
     }
