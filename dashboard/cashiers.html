@@ -431,6 +431,11 @@
 
     function setStatus(st) {
       selectedStatus = st;
+      // Reset role to All when filtering by HR status so no employees are hidden by role mismatch
+      selectedRole = '';
+      document.querySelectorAll('.role').forEach(b => {
+        b.classList.toggle('active', (b.dataset.role || '') === '');
+      });
       currentPage = 1;
       document.querySelectorAll('.st-btn').forEach(b => {
         b.classList.toggle('active', (b.dataset.status || '') === st);
@@ -611,6 +616,18 @@
         document.getElementById('pager').textContent = `Страница ${currentPage} из ${totalPages} · ${d.total || 0} кассиров`;
         document.getElementById('prev').disabled = currentPage <= 1;
         document.getElementById('next').disabled = currentPage >= totalPages;
+
+        if (!d.cashiers || d.cashiers.length === 0) {
+          document.getElementById('rows').innerHTML = `
+            <tr>
+              <td colspan="11" style="text-align:center;padding:30px;color:#64748b">
+                <b>Записи не найдены по выбранным фильтрам.</b><br>
+                <span style="font-size:13px">В загруженном отчёте сотрудники имеют другую категорию/должность. Нажмите <b><a href="javascript:void(0)" onclick="setRole('');setStatus('')" style="color:#2563eb;font-weight:bold">«Все кассиры»</a></b>.</span>
+              </td>
+            </tr>
+          `;
+          return;
+        }
 
         document.getElementById('rows').innerHTML = d.cashiers.map(x => {
           const loadColor = (x.load_percent > 100) ? '#dc2626' : (x.load_percent >= 70) ? '#16a34a' : '#d97706';

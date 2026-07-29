@@ -344,17 +344,23 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         if import_id is None:
             q = c.execute('SELECT id FROM cashier_imports ORDER BY id DESC LIMIT 1').fetchone()
             import_id = q['id'] if q else None
-        if not import_id:
-            return {'summary': {}, 'cashiers': [], 'categories': [], 'positions': [], 'top_by_position': {}, 'import': None, 'page': 1, 'total_pages': 1, 'total': 0}
-        info = dict(c.execute('SELECT * FROM cashier_imports WHERE id=?', (import_id,)).fetchone())
-        rows = [dict(z) for z in c.execute('SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC', (import_id,))]
+
+        info = None
+        rows = []
+        if import_id:
+            info_row = c.execute('SELECT * FROM cashier_imports WHERE id=?', (import_id,)).fetchone()
+            if info_row:
+                info = dict(info_row)
+                rows = [dict(z) for z in c.execute('SELECT * FROM cashier_reports WHERE import_id=? ORDER BY operations_count DESC', (import_id,))]
 
         # Fetch latest cashier statuses if available (File 2)
-        st_import = c.execute('SELECT id FROM cashier_status_imports ORDER BY id DESC LIMIT 1').fetchone()
+        st_import = c.execute('SELECT id, filename, imported_at FROM cashier_status_imports ORDER BY id DESC LIMIT 1').fetchone()
         status_map = {}
         status_map_2word = {}
         unmatched_statuses = []
         if st_import:
+            if not info:
+                info = {'id': 0, 'filename': st_import['filename'], 'imported_at': st_import['imported_at'], 'rows_count': 0}
             st_rows = c.execute('SELECT * FROM cashier_statuses WHERE import_id=?', (st_import['id'],)).fetchall()
             for s in st_rows:
                 s_dict = dict(s)
@@ -364,6 +370,9 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
                 if len(words) >= 2:
                     status_map_2word[f"{words[0]} {words[1]}"] = s_dict
                 unmatched_statuses.append(s_dict)
+
+        if not info:
+            return {'summary': {}, 'cashiers': [], 'categories': [], 'positions': [], 'top_by_position': {}, 'import': None, 'page': 1, 'total_pages': 1, 'total': 0}
 
     matched_status_names = set()
     for x in rows:
