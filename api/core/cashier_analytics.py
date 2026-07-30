@@ -45,9 +45,10 @@ SCHEMA = [
     ('ВАЛЮТА 100$', 27, 'usd_100_count', 'count'), ('ВАЛЮТА 100$', 28, 'usd_100_minutes', 'minutes'), ('ВАЛЮТА 100,01–1000$', 29, 'usd_100_1000_count', 'count'), ('ВАЛЮТА 100,01–1000$', 30, 'usd_100_1000_minutes', 'minutes'), ('ВАЛЮТА 1000,01–5000$', 31, 'usd_1000_5000_count', 'count'), ('ВАЛЮТА 1000,01–5000$', 32, 'usd_1000_5000_minutes', 'minutes'), ('ВАЛЮТА 10000$', 33, 'usd_10000_count', 'count'), ('ВАЛЮТА 10000$', 34, 'usd_10000_minutes', 'minutes'), ('ВАЛЮТА 5000,01–10000$', 35, 'usd_5000_10000_count', 'count'), ('ВАЛЮТА 5000,01–10000$', 36, 'usd_5000_10000_minutes', 'minutes'), ('Кирим, чиқим ҳужжатини текшириш, расмийлаштириш', 37, 'docs_count', 'count'), ('Кирим, чиқим ҳужжатини текшириш, расмийлаштириш', 38, 'docs_minutes', 'minutes'), ('Коммунал тўловлар (кирим-чиқим)', 39, 'utilities_count', 'count'), ('Коммунал тўловлар (кирим-чиқим)', 40, 'utilities_minutes', 'minutes'), ('Пластик карта тарқатиш', 41, 'card_issue_count', 'count'), ('Пластик карта тарқатиш', 42, 'card_issue_minutes', 'minutes'), ('Пластикдан нақд пул ечиш', 43, 'card_cashout_count', 'count'), ('Пластикдан нақд пул ечиш', 44, 'card_cashout_minutes', 'minutes'), ('БЕК фарқ', 45, 'bek_difference_count', 'count'), ('БЕК фарқ', 46, 'bek_difference_minutes', 'minutes'), ('ФРОНТ фарқ', 47, 'front_difference_count', 'count'), ('ФРОНТ фарқ', 48, 'front_difference_minutes', 'minutes')
 ]
 
-CORE = {'employee_number', 'total_marker', 'full_name', 'tab_number', 'days_worked', 'position', 'operations_count', 'operations_minutes', 'bek_count', 'bek_minutes', 'front_count', 'front_minutes'}
-BACK_GROUPS = {'Амалга оширилган операциялар сони (кирим-чиқим)', 'Банкоматга пул қўйиш', 'Касса мудири', 'Кечки кассир', 'Назоратчи кассир ролини бажарганда', 'Купюра санаш', 'Кирим, чиқим ҳужжатини текшириш, расмийлаштириш', 'БЕК фарқ'}
-FRONT_GROUPS = {'ВАЛЮТА 100$', 'ВАЛЮТА 100,01–1000$', 'ВАЛЮТА 1000,01–5000$', 'ВАЛЮТА 10000$', 'ВАЛЮТА 5000,01–10000$', 'Коммунал тўловлар (кирим-чиқим)', 'Пластик карта тарқатиш', 'Пластикдан нақд пул ечиш', 'ФРОНТ фарқ'}
+BACK_GROUPS = {'Амалга оширилган операциялар сони (кирим-чиқим)', 'Банкоматга пул қўйиш', 'Касса мудири', 'Кечки кассир', 'Назоратчи кассир ролини бажарганда', 'Купюра санаш', 'Кирим, чиқим ҳужжатини текшириш, расмийлаштириш'}
+FRONT_GROUPS = {'ВАЛЮТА 100$', 'ВАЛЮТА 100,01–1000$', 'ВАЛЮТА 1000,01–5000$', 'ВАЛЮТА 10000$', 'ВАЛЮТА 5000,01–10000$', 'Коммунал тўловлар (кирим-чиқим)', 'Пластик карта тарқатиш', 'Пластикдан нақд пул ечиш'}
+EXCLUDED_GROUPS = {'БЕК фарқ', 'ФРОНТ фарқ', 'Жами (БЕК)', 'Жами (ФРОНТ)', 'Жами амалиётлар', 'Жами', 'БЕК фарк', 'ФРОНТ фарк', 'Жами БЕК', 'Жами ФРОНТ'}
+
 
 def init_cashier_tables():
     with _connect() as c:
@@ -423,8 +424,11 @@ def _enrich(x, detail=False):
 
     x['load_difference'] = raw.get('load_difference', 0)
     x['cashier_type'] = cashier_role(x)
-    total_ops = x.get('operations_count', 0) or 1
 
+    real_metrics = {n: v for n, v in ops.items() if n not in EXCLUDED_GROUPS}
+    real_ops_total = sum(v.get('count', 0) for v in real_metrics.values()) or x.get('operations_count', 0) or 1
+
+    total_ops = x.get('operations_count', 0) or 1
     x['bek_pct'] = round((x.get('bek_count', 0) / total_ops) * 100, 1)
     x['front_pct'] = round((x.get('front_count', 0) / total_ops) * 100, 1)
     x['days_worked_pct'] = round((x.get('days_worked', 0) / 22) * 100, 1)
@@ -443,8 +447,8 @@ def _enrich(x, detail=False):
         'section': 'БЭК-операции' if n in BACK_GROUPS else 'ФРОНТ-операции' if n in FRONT_GROUPS else 'Прочее',
         'count': v.get('count', 0),
         'minutes': v.get('minutes', 0),
-        'pct': round(v.get('count', 0) / total_ops * 100, 1)
-    } for n, v in ops.items()]
+        'pct': round(v.get('count', 0) / real_ops_total * 100, 1)
+    } for n, v in real_metrics.items()]
     x['metrics'].sort(key=lambda m: m['count'], reverse=True)
     x['top_direction'] = x['metrics'][0]['name'] if x['metrics'] else '—'
     return x, ops
@@ -594,14 +598,26 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
     cats = {}
     allowed = BACK_GROUPS if role == 'back' else FRONT_GROUPS if role == 'front' else None
 
+    bek_tot = 0.0
+    front_tot = 0.0
+
     for x in rows:
         ops = json.loads(x.get('metrics_json') or '{}').get('operations', {})
         for n, v in ops.items():
+            if n in EXCLUDED_GROUPS:
+                continue
+            cnt = v.get('count', 0)
+            mins = v.get('minutes', 0)
+            if n in BACK_GROUPS:
+                bek_tot += cnt
+            elif n in FRONT_GROUPS:
+                front_tot += cnt
+
             if allowed is not None and n not in allowed:
                 continue
             a = cats.setdefault(n, {'name': n, 'count': 0, 'minutes': 0})
-            a['count'] += v.get('count', 0)
-            a['minutes'] += v.get('minutes', 0)
+            a['count'] += cnt
+            a['minutes'] += mins
 
     tot_cat_count = sum(c['count'] for c in cats.values()) or 1
     categories_list = []
@@ -614,10 +630,8 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
     page_size = min(max(1, page_size), 100)
     start = (page - 1) * page_size
 
-    total_ops = sum(x['operations_count'] for x in rows)
+    total_ops = bek_tot + front_tot
     total_min = sum(x['operations_minutes'] for x in rows)
-    bek_tot = sum(x['bek_count'] for x in rows)
-    front_tot = sum(x['front_count'] for x in rows)
     tot_load = sum(x['load_percent'] for x in rows)
     tot_eff = sum(x.get('efficiency_score', 0) for x in rows)
 
