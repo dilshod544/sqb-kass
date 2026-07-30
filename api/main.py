@@ -27,13 +27,19 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import sys
 import tempfile
+from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta, timezone
 
+# Ensure api directory is in python path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -513,12 +519,13 @@ def _aggregate_by_region(atms: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # АНАЛИТИКА КАССИРОВ — импорт Excel и агрегированные KPI
 # ═══════════════════════════════════════════════════════════
 
-@app.post("/api/cashiers/import", summary="Импорт отчёта KPI кассиров из XLSX")
+@app.post("/api/cashiers/import", summary="Импорт отчёта KPI кассиров из XLSX/CSV")
 async def import_cashiers(file: UploadFile = File(..., description="Excel-отчёт кассиров")):
-    if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(400, "Ожидается .xlsx файл")
+    if not file.filename or not (file.filename.lower().endswith(".xlsx") or file.filename.lower().endswith(".csv")):
+        raise HTTPException(400, "Ожидается .xlsx или .csv файл")
     tmp_dir = tempfile.mkdtemp(prefix="cashier_import_")
-    tmp_path = os.path.join(tmp_dir, file.filename)
+    tmp_name = file.filename if file.filename.lower().endswith(".xlsx") else f"{file.filename}.xlsx"
+    tmp_path = os.path.join(tmp_dir, tmp_name)
     try:
         with open(tmp_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
@@ -533,12 +540,13 @@ async def import_cashiers(file: UploadFile = File(..., description="Excel-отч
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-@app.post("/api/cashiers/import-status", summary="Импорт реестра штата и статусов кассиров из XLSX")
+@app.post("/api/cashiers/import-status", summary="Импорт реестра штата и статусов кассиров из XLSX/CSV")
 async def import_cashier_status(file: UploadFile = File(..., description="Excel-реестр штата и статусов кассиров")):
-    if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(400, "Ожидается .xlsx файл")
+    if not file.filename or not (file.filename.lower().endswith(".xlsx") or file.filename.lower().endswith(".csv")):
+        raise HTTPException(400, "Ожидается .xlsx или .csv файл")
     tmp_dir = tempfile.mkdtemp(prefix="cashier_status_import_")
-    tmp_path = os.path.join(tmp_dir, file.filename)
+    tmp_name = file.filename if file.filename.lower().endswith(".xlsx") else f"{file.filename}.xlsx"
+    tmp_path = os.path.join(tmp_dir, tmp_name)
     try:
         with open(tmp_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
@@ -556,12 +564,17 @@ async def get_cashier_analytics(
     import_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
-    role: Optional[str] = Query(None, pattern="^(back|front|universal)$"),
+    role: Optional[str] = Query(None, description="Фильтр по роли: back | front | universal"),
     search: Optional[str] = Query(None, description="Поиск по ФИО, должности, табелю, номеру"),
     position: Optional[str] = Query(None, description="Фильтр по должности"),
-    status: Optional[str] = Query(None, description="Фильтр по HR статусу: active | vacation | maternity | temporary | no_replacement"),
+    status: Optional[str] = Query(None, description="Фильтр по HR статусу: active | vacation | maternity | temporary | no_replacement | vacant"),
 ):
+    if role == "": role = None
+    if status == "": status = None
+    if search == "": search = None
+    if position == "": position = None
     return cashier_analytics(import_id, page, page_size, role, search, position, status)
+
 
 
 @app.get("/api/cashiers/{report_id}", summary="Углублённая аналитика одного кассира")

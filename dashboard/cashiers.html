@@ -434,15 +434,16 @@
     }
 
     function setStatus(st) {
-      selectedStatus = st;
-      // Reset role to All when filtering by HR status so no employees are hidden by role mismatch
-      selectedRole = '';
-      document.querySelectorAll('.role').forEach(b => {
-        b.classList.toggle('active', (b.dataset.role || '') === '');
-      });
+      selectedStatus = st || '';
+      if (st === '') {
+        selectedRole = '';
+        document.querySelectorAll('.role').forEach(b => {
+          b.classList.toggle('active', (b.dataset.role || '') === '');
+        });
+      }
       currentPage = 1;
       document.querySelectorAll('.st-btn').forEach(b => {
-        b.classList.toggle('active', (b.dataset.status || '') === st);
+        b.classList.toggle('active', (b.dataset.status || '') === (st || ''));
       });
       load();
     }
@@ -582,7 +583,8 @@
 
     async function load() {
       try {
-        let url = base + `/api/cashiers/analytics?page=${currentPage}&page_size=25&role=${selectedRole}`;
+        let url = base + `/api/cashiers/analytics?page=${currentPage}&page_size=25`;
+        if (selectedRole) url += `&role=${encodeURIComponent(selectedRole)}`;
         if (selectedStatus) url += `&status=${encodeURIComponent(selectedStatus)}`;
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
         if (selectedPosition) url += `&position=${encodeURIComponent(selectedPosition)}`;
@@ -823,10 +825,16 @@
     }
 
     function setRole(role) {
-      selectedRole = role;
+      selectedRole = role || '';
+      if (role === '') {
+        selectedStatus = '';
+        document.querySelectorAll('.st-btn').forEach(b => {
+          b.classList.toggle('active', (b.dataset.status || '') === '');
+        });
+      }
       currentPage = 1;
       document.querySelectorAll('.role').forEach(b => {
-        b.classList.toggle('active', (b.dataset.role || '') === role);
+        b.classList.toggle('active', (b.dataset.role || '') === (role || ''));
       });
       load();
     }

@@ -143,68 +143,136 @@ def save_cashier_import(filename, parsed):
     return {'import_id': iid, 'imported': len(parsed['records']), 'header_rows': parsed['header_rows']}
 
 def parse_cashier_status_xlsx(path: str | Path):
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-    all_rows = list(ws.iter_rows(values_only=True))
-    wb.close()
+    path_str = str(path)
+    tmp_copied = None
+
+    # Ensure openpyxl opens .csv files by copying to a temp .xlsx if needed
+    if path_str.lower().endswith('.csv'):
+        import shutil, tempfile
+        tmp_dir = tempfile.mkdtemp(prefix='status_parse_')
+        tmp_copied = Path(tmp_dir) / 'file_copy.xlsx'
+        shutil.copy(path, tmp_copied)
+        target_path = tmp_copied
+    else:
+        target_path = path
+
+    try:
+        wb = openpyxl.load_workbook(target_path, read_only=True, data_only=True)
+        ws = wb.active
+        all_rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+    finally:
+        if tmp_copied and tmp_copied.exists():
+            import shutil
+            shutil.rmtree(tmp_copied.parent, ignore_errors=True)
 
     if not all_rows:
         raise ValueError('Excel-файл пуст.')
 
-    records = []
-    current_branch = 'Не указан'
+    fio_col = None
+    pos_col = None
+    mfo_col = None
+    note_col = None
+    dir_col = None
+    header_row_idx = None
 
-    for row in all_rows:
+    # Step 1: Dynamic Header Detection (scanning top 30 rows)
+    for r_idx in range(min(30, len(all_rows))):
+        row = all_rows[r_idx]
+        if not row: continue
+        r_vals = [str(x or '').strip() for x in row]
+        n_vals = [norm(x) for x in r_vals]
+
+        f_c, p_c, m_c, n_c, d_c = None, None, None, None, None
+        for idx, nv in enumerate(n_vals):
+            if any(w in nv for w in ('ф и ш', 'ф и о', 'фио', 'фиш', 'fio', 'fish', 'сотрудник', 'работник', 'xodim')):
+                f_c = idx
+            elif any(w in nv for w in ('таркибий тузилмалар', 'лавозим номи', 'должность', 'position', 'lavozim')) and not any(k in nv for k in ('маош', 'оклад', 'разряд', 'коэффициент')):
+                p_c = idx
+            elif any(w in nv for w in ('mfo', 'мфо', 'код филиала')):
+                m_c = idx
+            elif any(w in nv for w in ('изох', 'примечание', 'статус', 'причина', 'note')):
+                n_c = idx
+            elif any(w in nv for w in ('йуналиши', 'йўналиши', 'направление')):
+                d_c = idx
+
+        if f_c is not None or p_c is not None:
+            fio_col, pos_col, mfo_col, note_col, dir_col = f_c, p_c, m_c, n_c, d_c
+            header_row_idx = r_idx
+            break
+
+    records = []
+    current_region = ''
+    current_branch = 'Не указан'
+    current_section = ''
+
+    start_idx = (header_row_idx + 1) if header_row_idx is not None else 0
+
+    for rn in range(start_idx, len(all_rows)):
+        row = all_rows[rn]
         if not row or not any(v not in (None, '') for v in row):
             continue
 
-        row_str = ' '.join(str(cell or '') for cell in row).strip()
-        n_row = norm(row_str)
+        r_str = [str(cell or '').strip() for cell in row]
+        row_text = ' '.join(r_str)
+        n_row = norm(row_text)
 
-        if 'филиал' in n_row or 'buxoro' in n_row or 'markazi' in n_row or 'ofisi' in n_row or 'бхм' in n_row or 'бхо' in n_row:
-            for cell in row:
-                if cell and any(w in str(cell).lower() for w in ('филиал', 'бхм', 'бхо', 'центр', 'офис')):
-                    current_branch = str(cell).strip()
-                    break
+        # Track region/branch headers
+        first_val = r_str[0] if r_str else ''
+        if first_val.startswith('Регион:') or 'регион' in norm(first_val):
+            current_region = first_val.replace('Регион:', '').strip()
+            continue
+        elif first_val.startswith('Филиал:') or any(w in norm(first_val) for w in ('филиал', 'бхм', 'бхо', 'центр', 'офис')):
+            current_branch = first_val.replace('Филиал:', '').strip()
+            continue
+        elif first_val.startswith('**'):
+            current_section = first_val.replace('**', '').strip()
             continue
 
-        # Extract values safely across columns B (2), C (3), D (4), E (5)
-        get = lambda col_idx: row[col_idx - 1] if len(row) >= col_idx else None
-        c_val = str(get(3) or '').strip()
-        d_val = str(get(4) or '').strip()
-        e_val = str(get(5) or '').strip()
+        # Extract values using detected columns or fallback heuristics
+        fio_val = r_str[fio_col] if fio_col is not None and len(r_str) > fio_col else ''
+        pos_val = r_str[pos_col] if pos_col is not None and len(r_str) > pos_col else ''
+        mfo_val = r_str[mfo_col] if mfo_col is not None and len(r_str) > mfo_col else ''
+        note_val = r_str[note_col] if note_col is not None and len(r_str) > note_col else ''
+        dir_val = r_str[dir_col] if dir_col is not None and len(r_str) > dir_col else ''
 
-        # Identify name vs position vs note dynamically
-        pos = c_val
-        name = d_val
-        note = e_val
+        # Heuristic fallback if columns were not explicitly matched by headers
+        if not fio_val:
+            get_safe = lambda c_idx: r_str[c_idx] if len(r_str) > c_idx else ''
+            # Try Col D (3), Col C (2), Col B (1)
+            for test_idx in (7, 3, 2, 1, 0):
+                val = get_safe(test_idx)
+                n_v = norm(val)
+                if val and len(val) >= 3 and not n_v in ('фиш', 'фио', 'ф и о', 'сони', 'минут', 'jami', 'итого', 'номер', '№', 'ставка'):
+                    if 'вакант' in n_v or len(val.split()) >= 2:
+                        fio_val = val
+                        break
 
-        # If name is in Column C and Column D is empty/note
-        if not name and len(c_val) >= 4 and not norm(c_val) in ('фиш', 'фио', 'ф и о', 'сони', 'минут'):
-            name = c_val
-            pos = 'Кассир'
+        if not pos_val:
+            pos_val = current_section if current_section else 'Кассир'
 
-        n_name = norm(name)
-        n_pos = norm(pos)
-        full_text = f"{pos} {name} {note}"
-        n_full = norm(full_text)
-
-        if not name or len(name) < 3 or n_name in ('фиш', 'фио', 'ф и о', 'сони', 'минут', 'jami', 'итого', 'номер', '№'):
+        n_fio = norm(fio_val)
+        if not fio_val or len(fio_val) < 3 or n_fio in ('ф и ш', 'ф и о', 'фио', 'фиш', 'jami', 'итого', 'сони', 'минут', 'номер', '№', 'ставка', 'всего'):
             continue
 
-        # Check for VACANT position
-        is_vacant = 'вакант' in n_name or 'vakant' in n_name or 'вакант' in n_full
-        if is_vacant:
-            name = 'ВАКАНТ'
-            raw_status = 'vacant'
-        else:
-            raw_status = 'active'
+        # Detect Vacant status
+        full_text = f"{pos_val} {fio_val} {note_val} {dir_val}"
+        is_vacant = 'вакант' in n_fio or 'vakant' in n_fio or 'вакант' in norm(full_text)
+        
+        full_name = 'ВАКАНТ' if is_vacant else fio_val
+        raw_status = 'vacant' if is_vacant else 'active'
+
+        branch_label = current_branch
+        if mfo_val and mfo_val not in current_branch:
+            branch_label = f"{mfo_val} - {current_branch}"
+
+        raw_note_str = note_val if note_val else (dir_val if dir_val else full_text)
 
         records.append({
-            'branch_name': current_branch,
-            'position': pos,
-            'full_name': name,
-            'raw_note': note if note else full_text,
+            'branch_name': branch_label,
+            'position': pos_val if pos_val else 'Кассир',
+            'full_name': full_name,
+            'raw_note': raw_note_str,
             'status_code': raw_status,
             'status_label': '⚪ Вакант' if is_vacant else 'Работает',
             'replacing_full_name': None,
@@ -213,7 +281,7 @@ def parse_cashier_status_xlsx(path: str | Path):
         })
 
     if not records:
-        raise ValueError('Не найдено ни одной строки с ФИО кассиров в реестре штата.')
+        raise ValueError('Не найдено ни одной валидной строки с ФИО кассиров или вакансиями в реестре штата.')
 
     # Smart Correlation Pass: match temporary employees (вакт.) with adjacent absent employees (декрет / мехнат.тат.)
     for i, r in enumerate(records):
@@ -222,9 +290,8 @@ def parse_cashier_status_xlsx(path: str | Path):
         n_text = norm(f"{r['position']} {r['full_name']} {r['raw_note']}")
         if 'вакт' in n_text or 'vakt' in n_text:
             r['status_code'] = 'temporary'
-            # Look at adjacent rows (+1, -1, +2, -2) in same branch
             candidates = []
-            for delta in (1, -1, 2, -2):
+            for delta in (1, -1, 2, -2, 3, -3):
                 idx = i + delta
                 if 0 <= idx < len(records):
                     cand = records[idx]
@@ -268,14 +335,26 @@ def save_cashier_status_import(filename, parsed):
     return {'import_id': iid, 'imported': len(parsed['records'])}
 
 def cashier_role(row):
-    pos = norm(row.get('position') or '')
-    if 'универсал' in pos or 'universal' in pos or 'назоратчи' in pos or 'nazoratchi' in pos or 'контролер' in pos:
-        return 'universal'
     b = float(row.get('bek_count', 0) or 0)
     f = float(row.get('front_count', 0) or 0)
-    if f >= b:
+    pos = norm(row.get('position') or '')
+
+    if f > 0 and b == 0:
         return 'front'
-    return 'back'
+    elif b > 0 and f == 0:
+        return 'back'
+    elif f > 0 and b > 0:
+        if f >= 2 * b:
+            return 'front'
+        elif b >= 2 * f:
+            return 'back'
+        else:
+            return 'universal'
+    else:
+        if 'универсал' in pos or 'universal' in pos or 'назоратчи' in pos or 'nazoratchi' in pos or 'контролер' in pos:
+            return 'universal'
+        return 'front'
+
 
 def compute_efficiency_score(x):
     lp = x.get('load_percent', 0)
@@ -434,29 +513,35 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
     # Include HR status employees who performed 0 operations (e.g. absent on maternity leave)
     for st in unmatched_statuses:
         if norm(st['full_name']) not in matched_status_names:
-            dummy_row = {
-                'id': 900000 + st['id'],
-                'import_id': import_id,
-                'tab_number': '—',
-                'full_name': st['full_name'],
-                'position': st.get('position') or 'Кассир',
-                'days_worked': 0,
-                'operations_count': 0,
-                'operations_minutes': 0,
-                'bek_count': 0,
-                'bek_minutes': 0,
-                'front_count': 0,
-                'front_minutes': 0,
-                'metrics_json': '{}',
-                'hr_status_code': st['status_code'],
-                'hr_status_label': st['status_label'],
-                'branch_name': st.get('branch_name', ''),
-                'replacing_full_name': st.get('replacing_full_name'),
-                'replaced_by_full_name': st.get('replaced_by_full_name'),
-                'has_replacement': st.get('has_replacement', 0),
-            }
-            _enrich(dummy_row)
-            rows.append(dummy_row)
+            st_pos = st.get('position') or ''
+            st_note = st.get('raw_note') or ''
+            n_pos_text = norm(f"{st_pos} {st_note}")
+            # Include only actual cashier roles (kassir, кассир, g'azna, gazna, kassa, касса)
+            if any(w in n_pos_text for w in ('kassir', 'кассир', 'g\'azn', 'gazn', 'kassa', 'касса')):
+                dummy_row = {
+                    'id': 900000 + st['id'],
+                    'import_id': import_id,
+                    'tab_number': '—',
+                    'full_name': st['full_name'],
+                    'position': st_pos if st_pos else 'Кассир',
+                    'days_worked': 0,
+                    'operations_count': 0,
+                    'operations_minutes': 0,
+                    'bek_count': 0,
+                    'bek_minutes': 0,
+                    'front_count': 0,
+                    'front_minutes': 0,
+                    'metrics_json': '{}',
+                    'hr_status_code': st['status_code'],
+                    'hr_status_label': st['status_label'],
+                    'branch_name': st.get('branch_name', ''),
+                    'replacing_full_name': st.get('replacing_full_name'),
+                    'replaced_by_full_name': st.get('replaced_by_full_name'),
+                    'has_replacement': st.get('has_replacement', 0),
+                }
+                _enrich(dummy_row)
+                rows.append(dummy_row)
+
 
     all_rows = list(rows)
 
@@ -473,8 +558,16 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
 
     positions_list = sorted(list(pos_groups.keys()))
 
-    if role in ('back', 'front', 'universal'):
-        rows = [x for x in rows if x['cashier_type'] == role]
+    if role and str(role).strip():
+        r_q = str(role).strip().lower()
+        if r_q == 'front':
+            rows = [x for x in rows if x['cashier_type'] == 'front' or (x.get('front_count', 0) > 0 and x.get('front_pct', 0) >= 50.0)]
+        elif r_q == 'back':
+            rows = [x for x in rows if x['cashier_type'] == 'back' or (x.get('bek_count', 0) > 0 and x.get('bek_pct', 0) >= 50.0)]
+        elif r_q == 'universal':
+            rows = [x for x in rows if x['cashier_type'] == 'universal' or (x.get('front_count', 0) > 0 and x.get('bek_count', 0) > 0) or 'универсал' in norm(x.get('position', '')) or 'nazoratchi' in norm(x.get('position', ''))]
+
+
 
     if status and str(status).strip():
         st_q = str(status).strip().lower()
