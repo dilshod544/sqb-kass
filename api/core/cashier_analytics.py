@@ -55,30 +55,25 @@ CORE = {'employee_number', 'total_marker', 'full_name', 'tab_number', 'days_work
 def parse_hr_status(raw_note: str, position: str = ''):
     raw_note = str(raw_note or '').strip()
     position = str(position or '').strip()
-    n_str = norm(f"{raw_note} {position}")
+    n_str = norm(f"{raw_note} {position}").replace(' ', '')
     
-    if any(w in n_str for w in ('мехнат тат', 'мехнаттат', 'отпуск', 'отпускда', 'отпуска')):
-        code, label = 'vacation', 'В отпуске (Меҳнат татили)'
-    elif any(w in n_str for w in ('декрет', 'декрет2', 'декрет1', 'декретда')):
-        code, label = 'maternity', 'В декрете'
-    elif any(w in n_str for w in ('вакт', 'вактинча', 'замещ', 'вактинчалик')):
-        code, label = 'temporary', 'Временное замещение'
-    elif any(w in n_str for w in ('вакант', 'свобод', 'bo\'sh', 'bosh')):
-        code, label = 'vacant', 'Вакантная ставка'
+    if any(w in n_str for w in ('vacant', 'вакант', 'свобод', 'bo\'sh', 'bosh')):
+        code, label = 'vacant', '⚪ Вакант (Свободная ставка)'
+    elif any(w in n_str for w in ('vakt', 'вакт', 'вактинча', 'замещ', 'вактинчалик')):
+        code, label = 'temporary', '🟡 Временный сотрудник'
+    elif any(w in n_str for w in ('dekret', 'декрет')):
+        code, label = 'maternity', '🟣 В декрете'
+    elif any(w in n_str for w in ('mexnat', 'мехнат', 'отпуск', 'tatil', 'татил')):
+        code, label = 'vacation', '🔵 В отпуске (Меҳнат татили)'
     else:
-        code, label = 'active', 'Работает'
-
-    has_replacement = 1
-    if code in ('vacation', 'maternity'):
-        if any(w in n_str for w in ('без замен', 'заменасиз', 'эгасиз', 'уринбосарсиз', 'замена йук')):
-            has_replacement = 0
-        elif any(w in n_str for w in ('ога', 'орнига', 'замен', 'заменил')):
-            has_replacement = 1
+        code, label = 'active', '🟢 Работает'
 
     return {
         'status_code': code,
         'status_label': label,
-        'has_replacement': has_replacement,
+        'has_replacement': 1 if code == 'active' else 0,
+        'replacing_full_name': None,
+        'replaced_by_full_name': None,
         'raw_note': raw_note
     }
 
@@ -217,6 +212,8 @@ def parse_cashiers_xlsx(path: str | Path):
             'hr_status_code': hr['status_code'],
             'hr_status_label': hr['status_label'],
             'has_replacement': hr['has_replacement'],
+            'replacing_full_name': None,
+            'replaced_by_full_name': None,
             'metrics': {}
         }
 
@@ -239,6 +236,49 @@ def parse_cashiers_xlsx(path: str | Path):
 
     if not records:
         raise ValueError(f'После строки шапки {header} не найдено валидных строк кассиров.')
+
+    # Rule 3: Direct Adjacent Correlation Pass ([vakt.] directly above [dekret] / [mexnat.tat.])
+    for i in range(len(records) - 1):
+        r_curr = records[i]
+        r_next = records[i + 1]
+        if r_curr['hr_status_code'] == 'temporary' and r_next['hr_status_code'] in ('maternity', 'vacation') and not r_curr.get('replacing_full_name') and not r_next.get('replaced_by_full_name'):
+            r_curr['replacing_full_name'] = r_next['full_name']
+            r_next['replaced_by_full_name'] = r_curr['full_name']
+            r_next['has_replacement'] = 1
+            r_curr['hr_status_label'] = f"🟡 Временный (замещает {r_next['full_name']})"
+            if r_next['hr_status_code'] == 'maternity':
+                r_next['hr_status_label'] = f"🟣 В декрете (замещает {r_curr['full_name']})"
+            elif r_next['hr_status_code'] == 'vacation':
+                r_next['hr_status_label'] = f"🔵 В отпуске (замещает {r_curr['full_name']})"
+
+    # Rule 4: Filial Grouping Correlation Pass (Match remaining [vakt.] and [dekret] within the SAME Filial / BXM)
+    branch_groups = {}
+    for r in records:
+        b_key = r.get('branch_name') or 'Default'
+        branch_groups.setdefault(b_key, []).append(r)
+
+    for b_key, b_recs in branch_groups.items():
+        unmatched_temps = [r for r in b_recs if r['hr_status_code'] == 'temporary' and not r.get('replacing_full_name')]
+        unmatched_absents = [r for r in b_recs if r['hr_status_code'] in ('maternity', 'vacation') and not r.get('replaced_by_full_name')]
+
+        for temp_r, abs_r in zip(unmatched_temps, unmatched_absents):
+            temp_r['replacing_full_name'] = abs_r['full_name']
+            abs_r['replaced_by_full_name'] = temp_r['full_name']
+            abs_r['has_replacement'] = 1
+            temp_r['hr_status_label'] = f"🟡 Временный (замещает {abs_r['full_name']})"
+            if abs_r['hr_status_code'] == 'maternity':
+                abs_r['hr_status_label'] = f"🟣 В декрете (замещает {temp_r['full_name']})"
+            elif abs_r['hr_status_code'] == 'vacation':
+                abs_r['hr_status_label'] = f"🔵 В отпуске (замещает {temp_r['full_name']})"
+
+        # Any remaining absent employees in this filial who did NOT get paired with a temporary employee get has_replacement = 0
+        for abs_r in b_recs:
+            if abs_r['hr_status_code'] in ('maternity', 'vacation') and not abs_r.get('replaced_by_full_name'):
+                abs_r['has_replacement'] = 0
+                if abs_r['hr_status_code'] == 'maternity':
+                    abs_r['hr_status_label'] = '🟣 В декрете (без замены!)'
+                elif abs_r['hr_status_code'] == 'vacation':
+                    abs_r['hr_status_label'] = '🔵 В отпуске (без замены!)'
 
     columns_desc = [f'{get_column_letter(col)}: {t}' for t, col, _, _ in SCHEMA]
     return {'records': records, 'errors': errors, 'header_rows': [header, header + 1], 'columns': columns_desc}
