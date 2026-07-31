@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Импорт реестра — выбор типа</title>
+  <title>Импорт отчётов — Cashier Intelligence</title>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -13,17 +13,14 @@
       --border: #e5eaf3;
       --text: #111827;
       --muted: #667085;
-      --primary: #2563eb;
-      --success: #16a34a;
-      --warning: #d97706;
-      --danger: #dc2626;
+      --primary: #10b981;
       --shadow-sm: 0 1px 2px rgba(16, 24, 40, .06);
       --shadow-md: 0 12px 28px rgba(16, 24, 40, .08);
       --shadow-lg: 0 24px 60px rgba(15, 23, 42, .14);
     }
     body {
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-      background: radial-gradient(circle at top left, rgba(37, 99, 235, .10), transparent 30%), var(--bg);
+      background: radial-gradient(circle at top left, rgba(16, 185, 129, .10), transparent 30%), var(--bg);
       min-height: 100vh;
       color: var(--text);
     }
@@ -35,7 +32,7 @@
     }
     h1 { font-size: 18px; font-weight: 850; letter-spacing: -.02em; }
     .badge {
-      background: linear-gradient(135deg, var(--primary), #60a5fa);
+      background: linear-gradient(135deg, #059669, #34d399);
       color: #fff; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 800;
     }
     .spacer { flex: 1; }
@@ -44,7 +41,7 @@
       padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border);
       background: #fff; color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 700;
     }
-    .nav-link:hover { color: var(--primary); border-color: #bfdbfe; }
+    .nav-link:hover { color: #059669; border-color: #a7f3d0; }
 
     .page { width: min(920px, calc(100vw - 32px)); margin: 48px auto 40px; }
 
@@ -69,15 +66,15 @@
     .option-card:hover {
       transform: translateY(-4px);
       box-shadow: var(--shadow-lg);
-      border-color: #bfdbfe;
+      border-color: #a7f3d0;
     }
     .option-icon {
       width: 56px; height: 56px; border-radius: 16px;
       display: flex; align-items: center; justify-content: center;
       color: #fff;
     }
-    .option-icon.atm { background: linear-gradient(135deg, var(--primary), #60a5fa); box-shadow: 0 8px 20px rgba(37,99,235,.3); }
-    .option-icon.branch { background: linear-gradient(135deg, #7c3aed, #a78bfa); box-shadow: 0 8px 20px rgba(124,58,237,.3); }
+    .option-icon.kpi { background: linear-gradient(135deg, #059669, #34d399); box-shadow: 0 8px 20px rgba(5,150,105,.3); }
+    .option-icon.status { background: linear-gradient(135deg, #7c3aed, #c084fc); box-shadow: 0 8px 20px rgba(124,58,237,.3); }
     .option-icon svg { width: 26px; height: 26px; }
 
     .option-title { font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
@@ -94,21 +91,18 @@
     }
     .option-action {
       display: inline-flex; align-items: center; gap: 8px;
-      font-size: 14px; font-weight: 750; color: var(--primary);
+      font-size: 14px; font-weight: 750;
     }
     .option-action svg { width: 16px; height: 16px; }
   </style>
 </head>
 <body>
 <header>
-  <span class="badge">ATM</span>
-  <h1>Импорт реестра</h1>
+  <span class="badge">Cashier Intelligence</span>
+  <h1>Выбор типа импорта</h1>
   <div class="spacer"></div>
-  <a class="nav-link" href="/dashboard/index.html">
-    <i data-lucide="home" style="width:16px;height:16px"></i> Главная
-  </a>
-  <a class="nav-link" href="/dashboard/map.html">
-    <i data-lucide="map" style="width:16px;height:16px"></i> Карта
+  <a class="nav-link" href="/dashboard/cashiers.html">
+    <i data-lucide="users" style="width:16px;height:16px"></i> Аналитика кассиров
   </a>
   <a class="nav-link" href="/docs" target="_blank">
     <i data-lucide="code" style="width:16px;height:16px"></i> API
@@ -118,38 +112,13 @@
 <div class="page">
   <div class="intro">
     <h2>Что вы хотите импортировать?</h2>
-    <p>Выберите тип реестра XLSX. Банкоматы и филиалы загружаются и хранятся отдельно, каждый со своим набором колонок и логикой сопоставления полей.</p>
+    <p>Выберите тип Excel-отчёта кассиров. Вы можете загрузить как операционный отчёт KPI, так и реестр штата и статусов кассиров.</p>
   </div>
 
   <div class="grid">
-    <a class="option-card" href="/dashboard/import.html">
-      <div class="option-icon atm"><i data-lucide="credit-card"></i></div>
-      <div class="option-title">Импорт банкоматов</div>
-      <p class="option-desc">
-        Реестр ATM: номера, локал коды, области, филиалы, модели, серийные номера,
-        Merchant/Terminal ID, адреса и геолокация.
-      </p>
-      <div class="option-cols">
-        Колонки: <code>№</code> <code>Локал код</code> <code>Худуд</code> <code>Филиал</code> <code>Term id</code>
-      </div>
-      <div class="option-action">Перейти к импорту банкоматов <i data-lucide="arrow-right"></i></div>
-    </a>
-
-    <a class="option-card" href="/dashboard/import-branches.html">
-      <div class="option-icon branch"><i data-lucide="building-2"></i></div>
-      <div class="option-title">Импорт филиалов</div>
-      <p class="option-desc">
-        Реестр филиалов банка с координатами и признаком выезда инкассаторов.
-      </p>
-      <div class="option-cols">
-        Колонки: <code>№</code> <code>Локал код</code> <code>Регион</code> <code>Адрес</code> <code>Инкассация</code>
-      </div>
-      <div class="option-action">Перейти к импорту филиалов <i data-lucide="arrow-right"></i></div>
-    </a>
-
     <a class="option-card" href="/dashboard/import-cashiers.html">
-      <div class="option-icon atm" style="background: linear-gradient(135deg, #059669, #34d399); box-shadow: 0 8px 20px rgba(5,150,105,.3)"><i data-lucide="calculator"></i></div>
-      <div class="option-title">Импорт 1: Состояние касс (KPI)</div>
+      <div class="option-icon kpi"><i data-lucide="calculator"></i></div>
+      <div class="option-title">Импорт 1: KPI и операции касс</div>
       <p class="option-desc">
         Операционный отчёт кассиров: количество операций, рабочие минуты, нагрузка %, расхождение, БЭК и ФРОНТ.
       </p>
@@ -160,10 +129,10 @@
     </a>
 
     <a class="option-card" href="/dashboard/import-cashier-status.html">
-      <div class="option-icon branch" style="background: linear-gradient(135deg, #7c3aed, #c084fc); box-shadow: 0 8px 20px rgba(124,58,237,.3)"><i data-lucide="user-check"></i></div>
-      <div class="option-title">Импорт 2: Состояние кассиров (Штат)</div>
+      <div class="option-icon status"><i data-lucide="user-check"></i></div>
+      <div class="option-title">Импорт 2: Штат и статусы кассиров</div>
       <p class="option-desc">
-        Реестр штата кассиров: структура филиалов, отпуска <code>(мехнат.тат.)</code>, декреты <code>(декрет2)</code>, временные очредники <code>(вакт.)</code>.
+        Реестр штата кассиров: структура филиалов, отпуска <code>(мехнат.тат.)</code>, декреты <code>(декрет2)</code>, временные замещения.
       </p>
       <div class="option-cols">
         Колонки: <code>Филиал</code> <code>Должность</code> <code>ФИО</code> <code>Отметка статуса</code>

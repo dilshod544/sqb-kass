@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ATM Intelligence Hub</title>
+  <title>Cashier Intelligence Hub</title>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -13,20 +13,18 @@
       --surface: rgba(22, 30, 49, 0.7);
       --surface-hover: rgba(30, 41, 67, 0.9);
       --border: rgba(255, 255, 255, 0.08);
-      --border-hover: rgba(59, 130, 246, 0.4);
+      --border-hover: rgba(16, 185, 129, 0.4);
       --text: #f3f4f6;
       --text-muted: #9ca3af;
-      --primary: #3b82f6;
-      --primary-gradient: linear-gradient(135deg, #3b82f6, #60a5fa);
-      --emerald-gradient: linear-gradient(135deg, #10b981, #34d399);
+      --primary: #10b981;
+      --primary-gradient: linear-gradient(135deg, #059669, #34d399);
       --purple-gradient: linear-gradient(135deg, #8b5cf6, #a78bfa);
-      --amber-gradient: linear-gradient(135deg, #f59e0b, #fbbf24);
       --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.4);
     }
 
     body {
-      font-family: 'Outfit', 'Inter', ui-sans-serif, system-ui, sans-serif;
-      background: radial-gradient(circle at 10% 20%, rgba(16, 24, 48, 1) 0%, rgba(11, 15, 25, 1) 90%);
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgba(16, 30, 24, 1) 0%, rgba(11, 15, 25, 1) 90%);
       color: var(--text);
       min-height: 100vh;
       display: flex;
@@ -35,43 +33,16 @@
       overflow-x: hidden;
     }
 
-    /* Background glow effects */
-    .glow {
-      position: absolute;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
-      top: -100px;
-      left: -100px;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    .glow-right {
-      position: absolute;
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
-      bottom: -150px;
-      right: -100px;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    /* Container */
     .container {
-      width: min(1200px, calc(100vw - 40px));
+      width: min(1000px, calc(100vw - 40px));
       margin: 0 auto;
-      padding: 40px 0;
-      position: relative;
-      z-index: 1;
+      padding: 60px 0;
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
     }
 
-    /* Header */
     header {
       text-align: center;
       margin-bottom: 50px;
@@ -81,7 +52,7 @@
       display: inline-flex;
       align-items: center;
       gap: 12px;
-      padding: 8px 16px;
+      padding: 8px 18px;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--border);
       border-radius: 99px;
@@ -100,120 +71,65 @@
     .logo-text {
       font-size: 13px;
       font-weight: 700;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
-      color: var(--primary);
+      color: var(--text-muted);
     }
 
     h1 {
-      font-size: clamp(32px, 5vw, 48px);
+      font-size: 42px;
       font-weight: 850;
-      letter-spacing: -0.04em;
-      line-height: 1.1;
+      letter-spacing: -0.03em;
       margin-bottom: 16px;
-      background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+      background: linear-gradient(to right, #ffffff, #9ca3af);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    .subtitle {
-      font-size: clamp(15px, 2vw, 18px);
+    p.subtitle {
+      font-size: 17px;
       color: var(--text-muted);
-      max-width: 640px;
+      max-width: 620px;
       margin: 0 auto;
       line-height: 1.6;
     }
 
-    /* Live Stats Bar */
-    .live-status {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-      margin-bottom: 40px;
-      flex-wrap: wrap;
-    }
-
-    .status-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--text-muted);
-      background: rgba(255, 255, 255, 0.02);
-      padding: 6px 16px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-    }
-
-    .status-item span.highlight {
-      color: #ffffff;
-      font-weight: 700;
-    }
-
-    /* Grid of Cards */
     .grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 24px;
-      margin-bottom: 50px;
     }
 
     @media (max-width: 768px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
+      .grid { grid-template-columns: 1fr; }
     }
 
-    /* Card Styling */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 24px;
-      padding: 32px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      backdrop-filter: blur(12px);
+      padding: 36px;
       text-decoration: none;
       color: inherit;
+      backdrop-filter: blur(16px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
       position: relative;
       overflow: hidden;
-      cursor: pointer;
-    }
-
-    .card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), transparent 60%);
-      opacity: 0;
-      transition: opacity 0.3s ease;
     }
 
     .card:hover {
-      background: var(--surface-hover);
+      transform: translateY(-6px);
       border-color: var(--border-hover);
-      transform: translateY(-4px);
+      background: var(--surface-hover);
       box-shadow: var(--shadow-lg);
     }
 
-    .card:hover::before {
-      opacity: 1;
-    }
-
-    .card-top {
-      position: relative;
-      z-index: 1;
-    }
-
     .card-icon {
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -221,190 +137,87 @@
       color: #ffffff;
     }
 
-    .card:nth-child(1) .card-icon { background: var(--primary-gradient); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); }
-    .card:nth-child(2) .card-icon { background: var(--emerald-gradient); box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3); }
-    .card:nth-child(3) .card-icon { background: var(--amber-gradient); box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); }
-    .card:nth-child(4) .card-icon { background: var(--purple-gradient); box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3); }
+    .card-icon.primary { background: var(--primary-gradient); box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); }
+    .card-icon.purple { background: var(--purple-gradient); box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3); }
 
     .card-title {
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 800;
       margin-bottom: 12px;
-      letter-spacing: -0.02em;
     }
 
     .card-desc {
       font-size: 14px;
       color: var(--text-muted);
-      line-height: 1.55;
-      margin-bottom: 28px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+      flex: 1;
     }
 
-    .card-action {
+    .card-link {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-size: 14px;
       font-weight: 700;
-      color: #ffffff;
-      position: relative;
-      z-index: 1;
-      transition: gap 0.2s ease;
+      color: #34d399;
     }
 
-    .card:hover .card-action {
-      gap: 12px;
-      color: #60a5fa;
-    }
-
-    .card-action svg {
-      width: 16px;
-      height: 16px;
-      transition: transform 0.2s ease;
-    }
-
-    .card:hover .card-action svg {
-      transform: translateX(2px);
-    }
-
-    /* Footer */
     footer {
       text-align: center;
-      padding: 20px 0;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.3);
-      border-top: 1px solid rgba(255, 255, 255, 0.03);
-      background: rgba(0, 0, 0, 0.2);
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
     }
   </style>
 </head>
 <body>
-  <div class="glow"></div>
-  <div class="glow-right"></div>
-
   <div class="container">
     <header>
       <div class="logo-container">
         <div class="logo-dot"></div>
-        <div class="logo-text">ATM Intelligence</div>
+        <span class="logo-text">System Active</span>
       </div>
-      <h1>Операционная панель управления</h1>
-      <p class="subtitle">Интеллектуальная система оптимизации инкассации, прогнозирования спроса и мониторинга реестра банкоматов</p>
+      <h1>Cashier Intelligence</h1>
+      <p class="subtitle">Интеллектуальная система аналитики KPI, структуры операций и состояния кассиров</p>
     </header>
 
-    <div class="live-status">
-      <div class="status-item">
-        <i data-lucide="activity" style="width:14px;height:14px;color:#10b981;vertical-align:-3px;margin-right:2px"></i>
-        Статус сервера: <span class="highlight" id="server-status">Подключение...</span>
-      </div>
-      <div class="status-item">
-        <i data-lucide="building-2" style="width:14px;height:14px;color:#3b82f6;vertical-align:-3px;margin-right:2px"></i>
-        Банкоматов в системе: <span class="highlight" id="atm-count">—</span>
-      </div>
-      <div class="status-item">
-        <i data-lucide="layers" style="width:14px;height:14px;color:#8b5cf6;vertical-align:-3px;margin-right:2px"></i>
-        Регион покрытия: <span class="highlight">Юнусабад, Ташкент</span>
-      </div>
-    </div>
-
     <div class="grid">
-      <!-- Card 1: Map -->
-      <a href="/dashboard/map.html" class="card">
-        <div class="card-top">
-          <div class="card-icon">
-            <i data-lucide="map" style="width:24px;height:24px"></i>
-          </div>
-          <h2 class="card-title">Карта и Мониторинг</h2>
-          <p class="card-desc">Интерактивный дашборд реального времени. Визуализация состояния сети банкоматов, симуляция снятия наличных и построение оптимизированных ML-маршрутов инкассации.</p>
-        </div>
-        <div class="card-action">
-          Открыть карту <i data-lucide="arrow-right"></i>
-        </div>
-      </a>
-
-      <!-- Card 2: Analytics -->
-      <a href="/dashboard/analytics.html" class="card">
-        <div class="card-top">
-          <div class="card-icon">
-            <i data-lucide="bar-chart-3" style="width:24px;height:24px"></i>
-          </div>
-          <h2 class="card-title">Операционная аналитика</h2>
-          <p class="card-desc">Анализ спроса на наличность, рисков cash-out событий по сети. Временной журнал транзакций банкоматов и сравнение эффективности ML-подхода с банковским регламентом.</p>
-        </div>
-        <div class="card-action">
-          Смотреть аналитику <i data-lucide="arrow-right"></i>
-        </div>
-      </a>
-
-      <!-- Card: Cashier analytics -->
       <a href="/dashboard/cashiers.html" class="card">
-        <div class="card-top">
-          <div class="card-icon"><i data-lucide="users-round" style="width:24px;height:24px"></i></div>
-          <h2 class="card-title">Аналитика кассиров</h2>
-          <p class="card-desc">Импорт отчётов кассиров Excel, KPI производительности, рейтинг, БЕК/ФРОНТ и интерактивные графики структуры операций.</p>
+        <div class="card-icon primary">
+          <i data-lucide="users" style="width: 28px; height: 28px;"></i>
         </div>
-        <div class="card-action">Открыть аналитику <i data-lucide="arrow-right"></i></div>
+        <div class="card-title">Аналитика кассиров</div>
+        <div class="card-desc">
+          Рейтинг, объём операций, рабочие минуты, нагрузка, БЭК/ФРОНТ операции и статусы штата кассиров.
+        </div>
+        <div class="card-link">
+          Открыть панель <i data-lucide="arrow-right" style="width: 16px; height: 16px;"></i>
+        </div>
       </a>
 
-      <!-- Card 3: Import -->
       <a href="/dashboard/import-select.html" class="card">
-        <div class="card-top">
-          <div class="card-icon">
-            <i data-lucide="file-spreadsheet" style="width:24px;height:24px"></i>
-          </div>
-          <h2 class="card-title">Импорт реестра XLSX</h2>
-          <p class="card-desc">Инструмент обновления реестра банкоматов и филиалов. Поддерживает автоматическое сопоставление кириллических, латинских и специальных полей и проверку корректности гео-координат.</p>
+        <div class="card-icon purple">
+          <i data-lucide="upload-cloud" style="width: 28px; height: 28px;"></i>
         </div>
-        <div class="card-action">
-          Загрузить реестр <i data-lucide="arrow-right"></i>
+        <div class="card-title">Импорт Excel-отчётов</div>
+        <div class="card-desc">
+          Загрузка новых операционных Excel-отчётов (KPI) и реестров штата кассиров в базу данных.
         </div>
-      </a>
-
-      <a href="/dashboard/incassation.html" class="card"><div class="card-top"><div class="card-icon"><i data-lucide="calendar-clock" style="width:24px;height:24px"></i></div><h2 class="card-title">План инкассаций</h2><p class="card-desc">Календарь прогнозных выездов: риск low-cash, приоритеты, сумма пополнения и региональные маршруты от филиала.</p></div><div class="card-action">Открыть план <i data-lucide="arrow-right"></i></div></a>
-
-      <!-- Card 4: Swagger Docs -->
-      <a href="/docs" target="_blank" class="card">
-        <div class="card-top">
-          <div class="card-icon">
-            <i data-lucide="code" style="width:24px;height:24px"></i>
-          </div>
-          <h2 class="card-title">Документация API</h2>
-          <p class="card-desc">Интерактивная спецификация REST API (Swagger). Описание эндпоинтов для управления кассетами, обновления балансов, интеграции систем мониторинга и выгрузки геоданных.</p>
-        </div>
-        <div class="card-action">
-          Спецификация API <i data-lucide="arrow-right"></i>
+        <div class="card-link" style="color: #a78bfa;">
+          Перейти к импорту <i data-lucide="arrow-right" style="width: 16px; height: 16px;"></i>
         </div>
       </a>
     </div>
   </div>
 
   <footer>
-    &copy; 2026 ATM Intelligence. Разработано для SQB Arena.
+    Cashier Intelligence Platform &copy; 2026
   </footer>
 
   <script>
     lucide.createIcons();
-
-    const API_BASE = `${location.protocol}//${location.hostname}:8000`;
-
-    async function fetchStats() {
-      try {
-        const res = await fetch(`${API_BASE}/api/atms/stats`);
-        if (!res.ok) throw new Error('API error');
-        const data = await res.json();
-        
-        document.getElementById('server-status').textContent = 'Online';
-        document.getElementById('server-status').style.color = '#10b981';
-        document.getElementById('atm-count').textContent = data.total || 0;
-      } catch (err) {
-        console.error('Failed to fetch stats:', err);
-        document.getElementById('server-status').textContent = 'Offline';
-        document.getElementById('server-status').style.color = '#ef4444';
-        document.getElementById('atm-count').textContent = '—';
-      }
-    }
-
-    fetchStats();
   </script>
 </body>
 </html>

@@ -1,21 +1,10 @@
 """
-Централизованная конфигурация.
-Все пути, пороги и параметры берутся отсюда.
+Конфигурация проекта Cashier Intelligence.
 """
 
 from pathlib import Path
 
 # ── Пути ────────────────────────────────────────────────────
-BASE_DIR   = Path(__file__).resolve().parents[2]   # корень проекта
-DATA_DIR   = BASE_DIR / "data"
+BASE_DIR = Path(__file__).resolve().parents[2]   # корень проекта
+DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
-
-# ── Бизнес-пороги ────────────────────────────────────────────
-LOW_CASH_PCT      = 0.20    # критичный уровень (cash-out)
-WARNING_CASH_PCT  = 0.40    # уровень предупреждения
-DEFAULT_CAPACITY  = 400_000_000   # ёмкость ATM по умолчанию, UZS
-
-# ── Геометрия / маршруты инкассации ─────────────────────────
-DEPOT = {"lat": 41.3111, "lon": 69.2797, "name": "Центральный депо (Ташкент)"}
-ROAD_FACTOR = 1.35
-AVG_SPEED_KMH = 30

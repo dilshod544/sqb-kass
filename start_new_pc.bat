@@ -1,7 +1,7 @@
 @echo off
-title ATM Monitor Setup and Start
+title Cashier Intelligence Setup and Start
 echo ===================================================
-echo   ATM Monitor - Автоматическая настройка нового ПК
+echo   Cashier Intelligence - Автоматическая настройка
 echo   (Портативный запуск без прав администратора)
 echo ===================================================
 echo.
@@ -88,7 +88,7 @@ set PYTHONPATH=%~dp0api;%PYTHONPATH%
 echo.
 echo ===================================================
 echo   Сервер готов к запуску!
-echo   Dashboard: http://localhost:8000/dashboard/index.html
+echo   Dashboard: http://localhost:8000/dashboard/cashiers.html
 echo   Swagger:  http://localhost:8000/docs
 echo ===================================================
 echo.

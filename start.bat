@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo   ATM Monitor - Запуск сервера
+echo   Cashier Intelligence - Запуск сервера
 echo ========================================
 
 :: Kill old process on port 8000
@@ -18,10 +18,9 @@ py -m pip install -r requirements.txt
 set PYTHONPATH=%~dp0api;%PYTHONPATH%
 
 echo.
-echo Server:   http://localhost:8000
-echo Dashboard: http://localhost:8000/dashboard/index.html
-echo Swagger:  http://localhost:8000/docs
-echo Import XLSX: POST /api/atms/import
+echo Server:    http://localhost:8000
+echo Dashboard: http://localhost:8000/dashboard/cashiers.html
+echo Swagger:   http://localhost:8000/docs
 echo ========================================
 echo.
 
