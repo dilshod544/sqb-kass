@@ -889,7 +889,6 @@
         <button class="pill-btn role active" data-role="" onclick="setRole('')">Все кассиры</button>
         <button class="pill-btn role" data-role="back" onclick="setRole('back')">💼 БЭК-кассиры</button>
         <button class="pill-btn role" data-role="front" onclick="setRole('front')">💳 ФРОНТ-кассиры</button>
-        <button class="pill-btn role" data-role="universal" onclick="setRole('universal')">🛡️ Универсальные / Назоратчи</button>
       </div>
 
       <!-- Row 3: HR Status Pills -->
@@ -1392,10 +1391,8 @@
         const badge = document.getElementById('m-role-badge');
         if (x.cashier_type === 'front') {
           badge.className = 'badge-role badge-front'; badge.textContent = '💳 ФРОНТ-кассир (Front > Bek)';
-        } else if (x.cashier_type === 'back') {
-          badge.className = 'badge-role badge-back'; badge.textContent = '💼 БЭК-кассир (Bek > Front)';
         } else {
-          badge.className = 'badge-role badge-universal'; badge.textContent = '🛡️ Универсальный кассир';
+          badge.className = 'badge-role badge-back'; badge.textContent = '💼 БЭК-кассир (Bek ≥ Front)';
         }
 
         const hrBadge = document.getElementById('m-hr-status-badge');
