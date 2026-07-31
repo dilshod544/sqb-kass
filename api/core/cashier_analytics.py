@@ -56,15 +56,17 @@ def parse_hr_status(raw_note: str, position: str = ''):
     raw_note = str(raw_note or '').strip()
     position = str(position or '').strip()
     n_str = norm(f"{raw_note} {position}").replace(' ', '')
-    
-    if any(w in n_str for w in ('vacant', 'вакант', 'свобод', 'bo\'sh', 'bosh')):
+
+    # ORDER MATTERS: check vacant first (bosh, vakant), then temporary (vakt = replacement),
+    # then dekret, then vacation
+    if any(w in n_str for w in ('vacant', 'вакант', 'свобод', 'vakant', 'bosh', 'bush', 'бош', 'буш')):
         code, label = 'vacant', '⚪ Вакант (Свободная ставка)'
-    elif any(w in n_str for w in ('vakt', 'вакт', 'вактинча', 'замещ', 'вактинчалик')):
-        code, label = 'temporary', '🟡 Временный сотрудник'
     elif any(w in n_str for w in ('dekret', 'декрет')):
         code, label = 'maternity', '🟣 В декрете'
     elif any(w in n_str for w in ('mexnat', 'мехнат', 'отпуск', 'tatil', 'татил')):
         code, label = 'vacation', '🔵 В отпуске (Меҳнат татили)'
+    elif any(w in n_str for w in ('vakt', 'вакт', 'вактинча', 'замещ', 'вактинчалик', 'zamesh')):
+        code, label = 'temporary', '🟡 Временный сотрудник'
     else:
         code, label = 'active', '🟢 Работает'
 
@@ -368,7 +370,6 @@ def parse_cashier_status_xlsx(path: str | Path):
         all_rows = list(ws.iter_rows(values_only=True))
         wb.close()
 
-
     if not all_rows:
         raise ValueError('Excel-файл пуст.')
 
@@ -379,10 +380,11 @@ def parse_cashier_status_xlsx(path: str | Path):
     dir_col = None
     header_row_idx = None
 
-    # Step 1: Dynamic Header Detection (scanning top 30 rows)
+    # Dynamic Header Detection (scanning top 30 rows)
     for r_idx in range(min(30, len(all_rows))):
         row = all_rows[r_idx]
-        if not row: continue
+        if not row:
+            continue
         r_vals = [str(x or '').strip() for x in row]
         n_vals = [norm(x) for x in r_vals]
 
@@ -405,7 +407,6 @@ def parse_cashier_status_xlsx(path: str | Path):
             break
 
     records = []
-    current_region = ''
     current_branch = 'Не указан'
     current_section = ''
 
@@ -417,36 +418,32 @@ def parse_cashier_status_xlsx(path: str | Path):
             continue
 
         r_str = [str(cell or '').strip() for cell in row]
-        row_text = ' '.join(r_str)
-        n_row = norm(row_text)
-
-        # Track region/branch headers
         first_val = r_str[0] if r_str else ''
-        if first_val.startswith('Регион:') or 'регион' in norm(first_val):
-            current_region = first_val.replace('Регион:', '').strip()
+        n_first = norm(first_val)
+
+        # Track branch/section headers
+        if first_val.startswith('Регион:') or 'регион' in n_first:
             continue
-        elif first_val.startswith('Филиал:') or any(w in norm(first_val) for w in ('филиал', 'бхм', 'бхо', 'центр', 'офис')):
+        if first_val.startswith('Филиал:') or any(w in n_first for w in ('филиал', 'бхм', 'бхо', 'центр', 'офис')):
             current_branch = first_val.replace('Филиал:', '').strip()
             continue
-        elif first_val.startswith('**'):
+        if first_val.startswith('**'):
             current_section = first_val.replace('**', '').strip()
             continue
 
-        # Extract values using detected columns or fallback heuristics
-        fio_val = r_str[fio_col] if fio_col is not None and len(r_str) > fio_col else ''
-        pos_val = r_str[pos_col] if pos_col is not None and len(r_str) > pos_col else ''
-        mfo_val = r_str[mfo_col] if mfo_col is not None and len(r_str) > mfo_col else ''
+        # Extract column values
+        fio_val  = r_str[fio_col]  if fio_col  is not None and len(r_str) > fio_col  else ''
+        pos_val  = r_str[pos_col]  if pos_col  is not None and len(r_str) > pos_col  else ''
+        mfo_val  = r_str[mfo_col]  if mfo_col  is not None and len(r_str) > mfo_col  else ''
         note_val = r_str[note_col] if note_col is not None and len(r_str) > note_col else ''
-        dir_val = r_str[dir_col] if dir_col is not None and len(r_str) > dir_col else ''
+        dir_val  = r_str[dir_col]  if dir_col  is not None and len(r_str) > dir_col  else ''
 
-        # Heuristic fallback if columns were not explicitly matched by headers
+        # Fallback: find FIO if not detected by header
         if not fio_val:
-            get_safe = lambda c_idx: r_str[c_idx] if len(r_str) > c_idx else ''
-            # Try Col D (3), Col C (2), Col B (1)
             for test_idx in (7, 3, 2, 1, 0):
-                val = get_safe(test_idx)
+                val = r_str[test_idx] if len(r_str) > test_idx else ''
                 n_v = norm(val)
-                if val and len(val) >= 3 and not n_v in ('фиш', 'фио', 'ф и о', 'сони', 'минут', 'jami', 'итого', 'номер', '№', 'ставка'):
+                if val and len(val) >= 3 and n_v not in ('фиш', 'фио', 'ф и о', 'сони', 'минут', 'jami', 'итого', 'номер', '№', 'ставка'):
                     if 'вакант' in n_v or len(val.split()) >= 2:
                         fio_val = val
                         break
@@ -458,26 +455,25 @@ def parse_cashier_status_xlsx(path: str | Path):
         if not fio_val or len(fio_val) < 3 or n_fio in ('ф и ш', 'ф и о', 'фио', 'фиш', 'jami', 'итого', 'сони', 'минут', 'номер', '№', 'ставка', 'всего'):
             continue
 
-        # Detect Vacant status
+        # Build combined text for status detection
         full_text = f"{pos_val} {fio_val} {note_val} {dir_val}"
-        is_vacant = 'вакант' in n_fio or 'vakant' in n_fio or 'вакант' in norm(full_text)
-        
-        full_name = 'ВАКАНТ' if is_vacant else fio_val
-        raw_status = 'vacant' if is_vacant else 'active'
+        n_full = norm(full_text)
+        is_vacant = 'вакант' in n_fio or 'vakant' in n_fio or 'вакант' in n_full
 
+        full_name = 'ВАКАНТ' if is_vacant else fio_val
         branch_label = current_branch
         if mfo_val and mfo_val not in current_branch:
             branch_label = f"{mfo_val} - {current_branch}"
 
-        raw_note_str = note_val if note_val else (dir_val if dir_val else full_text)
+        raw_note_str = note_val or dir_val or full_text
 
         records.append({
             'branch_name': branch_label,
             'position': pos_val if pos_val else 'Кассир',
             'full_name': full_name,
             'raw_note': raw_note_str,
-            'status_code': raw_status,
-            'status_label': '⚪ Вакант' if is_vacant else 'Работает',
+            'status_code': 'vacant' if is_vacant else 'active',
+            'status_label': '⚪ Вакант' if is_vacant else '🟢 Ишлаяпти',
             'replacing_full_name': None,
             'replaced_by_full_name': None,
             'has_replacement': 0
@@ -486,44 +482,71 @@ def parse_cashier_status_xlsx(path: str | Path):
     if not records:
         raise ValueError('Не найдено ни одной валидной строки с ФИО кассиров или вакансиями в реестре штата.')
 
-    # Smart Correlation Pass: match temporary employees (вакт.) with adjacent absent employees (декрет / мехнат.тат.)
-    for i, r in enumerate(records):
-        if r['status_code'] == 'vacant':
-            continue
-        n_text = norm(f"{r['position']} {r['full_name']} {r['raw_note']}")
-        if 'вакт' in n_text or 'vakt' in n_text:
-            r['status_code'] = 'temporary'
-            candidates = []
-            for delta in (1, -1, 2, -2, 3, -3):
-                idx = i + delta
-                if 0 <= idx < len(records):
-                    cand = records[idx]
-                    cand_text = norm(f"{cand['position']} {cand['full_name']} {cand['raw_note']}")
-                    if any(w in cand_text for w in ('декрет', 'тат', 'отпуск')) and not cand.get('has_replacement'):
-                        candidates.append((abs(delta), cand))
-            if candidates:
-                candidates.sort(key=lambda x: x[0])
-                target = candidates[0][1]
-                r['replacing_full_name'] = target['full_name']
-                target['replaced_by_full_name'] = r['full_name']
-                target['has_replacement'] = 1
-
+    # -----------------------------------------------------------------------
+    # Pass 1: Determine status_code from raw_note / position text
+    # Priority: dekret > vacation > vakt(temporary) > active
+    # -----------------------------------------------------------------------
     for r in records:
         if r['status_code'] == 'vacant':
-            r['status_label'] = '⚪ Вакант (Свободная ставка)'
             continue
         n_text = norm(f"{r['position']} {r['full_name']} {r['raw_note']}")
-        if r['status_code'] == 'temporary':
-            r['status_label'] = f"Временный (замещает {r['replacing_full_name']})" if r['replacing_full_name'] else 'Временный сотрудник'
-        elif 'декрет' in n_text:
+        if 'dekret' in n_text or 'декрет' in n_text:
             r['status_code'] = 'maternity'
-            r['status_label'] = f"В декрете (замещает {r['replaced_by_full_name']})" if r['has_replacement'] else 'В декрете (без замены)'
-        elif 'тат' in n_text or 'отпуск' in n_text:
+        elif any(w in n_text for w in ('mexnat tat', 'мехнат тат', 'мехнаттатил', 'mexnattatil', 'отпуск', 'tatil', 'татил')):
             r['status_code'] = 'vacation'
-            r['status_label'] = f"В отпуске (замещает {r['replaced_by_full_name']})" if r['has_replacement'] else 'В отпуске (без замены)'
+        elif any(w in n_text for w in ('vakt', 'вакт', 'zamesh', 'замещ')):
+            r['status_code'] = 'temporary'
+        # else stays 'active'
+
+    # -----------------------------------------------------------------------
+    # Pass 2: Filial-based pairing — match temps to absents within same branch.
+    #         dekret/vacation > temp count → leftover absents = bez zameny
+    # -----------------------------------------------------------------------
+    branch_recs = {}
+    for r in records:
+        bk = r.get('branch_name') or 'Default'
+        branch_recs.setdefault(bk, []).append(r)
+
+    for bk, b_list in branch_recs.items():
+        temps   = [r for r in b_list if r['status_code'] == 'temporary']
+        absents = [r for r in b_list if r['status_code'] in ('maternity', 'vacation')]
+
+        for temp_r, abs_r in zip(temps, absents):
+            temp_r['replacing_full_name'] = abs_r['full_name']
+            abs_r['replaced_by_full_name'] = temp_r['full_name']
+            abs_r['has_replacement'] = 1
+
+        # Absents not paired with any temp = без замены
+        paired_cnt = min(len(temps), len(absents))
+        for abs_r in absents[paired_cnt:]:
+            abs_r['has_replacement'] = 0
+
+    # -----------------------------------------------------------------------
+    # Pass 3: Build readable status labels with emoji
+    # -----------------------------------------------------------------------
+    for r in records:
+        sc = r['status_code']
+        if sc == 'vacant':
+            r['status_label'] = '⚪ Вакант (Свободная ставка)'
+        elif sc == 'temporary':
+            r['status_label'] = (
+                f"🟡 Вақтинча (ўринбосар: {r['replacing_full_name']})"
+                if r.get('replacing_full_name') else '🟡 Вақтинча ходим'
+            )
+        elif sc == 'maternity':
+            r['status_label'] = (
+                f"🟣 Декретда (ўрнида: {r['replaced_by_full_name']})"
+                if r.get('replaced_by_full_name') else '🟣 Декретда (без замены!)'
+            )
+        elif sc == 'vacation':
+            r['status_label'] = (
+                f"🔵 Меҳнат татилда (ўрнида: {r['replaced_by_full_name']})"
+                if r.get('replaced_by_full_name') else '🔵 Меҳнат татилда (без замены!)'
+            )
         else:
             r['status_code'] = 'active'
-            r['status_label'] = 'Работает'
+            r['status_label'] = '🟢 Ишлаяпти'
+            r['has_replacement'] = 1
 
     return {'records': records, 'total_rows': len(all_rows)}
 
