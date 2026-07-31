@@ -167,6 +167,19 @@ def parse_cashiers_xlsx(path: str | Path):
     if not col_pos: col_pos = 6 if col_fio != 6 else 2
     if not col_days: col_days = 5
 
+    # Smart Fallback for Branch Code & Branch Name by inspecting data rows
+    if not col_bcode or not col_bname:
+        for test_rn in range(data_start - 1, min(data_start + 15, len(all_rows))):
+            t_row = all_rows[test_rn]
+            if not t_row or len(t_row) < 6:
+                continue
+            v5 = str(t_row[4] or '').strip() # Col E
+            v6 = str(t_row[5] or '').strip() # Col F
+            if v5.replace('.', '').isdigit() and len(v5) >= 4 and any(w in norm(v6) for w in ('бхм', 'бхо', 'центр', 'офис', 'филиал', 'экспресс', 'банк', 'бхм ')):
+                col_bcode = 5
+                col_bname = 6
+                break
+
     records = []
     errors = []
 
@@ -218,6 +231,11 @@ def parse_cashiers_xlsx(path: str | Path):
         }
 
         # Parse SCHEMA metrics
+        bek_ops_cnt = 0.0
+        bek_ops_min = 0.0
+        front_ops_cnt = 0.0
+        front_ops_min = 0.0
+
         for title, col, key, kind in SCHEMA:
             v = get(col)
             if kind == 'text':
@@ -231,6 +249,31 @@ def parse_cashiers_xlsx(path: str | Path):
                 else:
                     m = rec['metrics'].setdefault(title, {})
                     m[kind] = value
+                    if title in BACK_GROUPS:
+                        if kind == 'count': bek_ops_cnt += value
+                        elif kind == 'minutes': bek_ops_min += value
+                    elif title in FRONT_GROUPS:
+                        if kind == 'count': front_ops_cnt += value
+                        elif kind == 'minutes': front_ops_min += value
+
+        # Fill mathematical operation totals if summary columns were 0 or unmapped
+        tot_ops_cnt = bek_ops_cnt + front_ops_cnt
+        tot_ops_min = bek_ops_min + front_ops_min
+
+        if rec.get('operations_count', 0) == 0 and tot_ops_cnt > 0:
+            rec['operations_count'] = tot_ops_cnt
+        if rec.get('operations_minutes', 0) == 0 and tot_ops_min > 0:
+            rec['operations_minutes'] = tot_ops_min
+
+        if rec.get('bek_count', 0) == 0 and bek_ops_cnt > 0:
+            rec['bek_count'] = bek_ops_cnt
+        if rec.get('bek_minutes', 0) == 0 and bek_ops_min > 0:
+            rec['bek_minutes'] = bek_ops_min
+
+        if rec.get('front_count', 0) == 0 and front_ops_cnt > 0:
+            rec['front_count'] = front_ops_cnt
+        if rec.get('front_minutes', 0) == 0 and front_ops_min > 0:
+            rec['front_minutes'] = front_ops_min
 
         records.append(rec)
 
