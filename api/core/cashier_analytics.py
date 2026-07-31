@@ -695,12 +695,10 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
             x['replaced_by_full_name'] = st.get('replaced_by_full_name')
             x['has_replacement'] = st.get('has_replacement', 0)
         else:
-            x['hr_status_code'] = 'active'
-            x['hr_status_label'] = 'Работает'
-            x['branch_name'] = ''
-            x['replacing_full_name'] = None
-            x['replaced_by_full_name'] = None
-            x['has_replacement'] = 1
+            # No external status file match — preserve what was already stored from Excel import
+            x.setdefault('hr_status_code', 'active')
+            x.setdefault('hr_status_label', 'Работает')
+            # branch_name already populated from DB (imported from Excel)
 
     # Include HR status employees who performed 0 operations (e.g. absent on maternity leave)
     for st in unmatched_statuses:
@@ -839,9 +837,8 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         'bek_pct': round(bek_tot / total_ops * 100, 1) if total_ops else 0,
         'front_operations': round(front_tot),
         'front_pct': round(front_tot / total_ops * 100, 1) if total_ops else 0,
-        'back_cashiers': sum(x['cashier_type'] == 'back' for x in rows),
-        'front_cashiers': sum(x['cashier_type'] == 'front' for x in rows),
-        'universal_cashiers': sum(x['cashier_type'] == 'universal' for x in rows),
+        'back_cashiers': sum(1 for x in rows if x.get('cashier_type') == 'back'),
+        'front_cashiers': sum(1 for x in rows if x.get('cashier_type') == 'front'),
         'active_cashiers': sum(x.get('hr_status_code') == 'active' for x in rows),
         'vacation_cashiers': sum(x.get('hr_status_code') == 'vacation' for x in rows),
         'maternity_cashiers': sum(x.get('hr_status_code') == 'maternity' for x in rows),

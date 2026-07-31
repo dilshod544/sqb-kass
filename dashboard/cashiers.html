@@ -1020,6 +1020,22 @@
         </div>
       </div>
 
+      <!-- BEK / FRONT split bar -->
+      <div id="m-split-section" style="margin-top:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px">
+        <div style="font-size:12px;font-weight:800;color:#475569;margin-bottom:10px">БЭК / ФРОНТ — операциялар нисбати:</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="m-bek-lbl" style="font-size:13px;font-weight:800;color:#7c3aed;min-width:80px">БЭК: —</span>
+          <div style="flex:1;height:12px;background:#e2e8f0;border-radius:6px;overflow:hidden;position:relative">
+            <div id="m-bek-bar" style="height:100%;background:#7c3aed;width:0%;transition:width 0.4s ease;border-radius:6px"></div>
+          </div>
+          <span id="m-front-lbl" style="font-size:13px;font-weight:800;color:#0369a1;min-width:90px;text-align:right">ФРОНТ: —</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px">
+          <span id="m-bek-cnt" style="font-size:11px;color:#64748b">—</span>
+          <span id="m-front-cnt" style="font-size:11px;color:#64748b">—</span>
+        </div>
+      </div>
+
       <div style="margin-top:24px">
         <h3 style="margin:0 0 12px;font-size:16px;font-weight:800">Распределение выполненных операций (%)</h3>
         <div style="height:260px"><canvas id="modal-chart"></canvas></div>
@@ -1318,11 +1334,9 @@
 
           let roleBadgeHTML = '';
           if (x.cashier_type === 'front') {
-            roleBadgeHTML = `<span class="badge-role badge-front" style="font-size:10px;padding:2px 6px">ФРОНТ</span>`;
-          } else if (x.cashier_type === 'back') {
-            roleBadgeHTML = `<span class="badge-role badge-back" style="font-size:10px;padding:2px 6px">БЭК</span>`;
+            roleBadgeHTML = `<span class="badge-role badge-front" style="font-size:10px;padding:2px 6px">💳 ФРОНТ</span>`;
           } else {
-            roleBadgeHTML = `<span class="badge-role badge-universal" style="font-size:10px;padding:2px 6px">УНИВЕРСАЛ</span>`;
+            roleBadgeHTML = `<span class="badge-role badge-back" style="font-size:10px;padding:2px 6px">💼 БЭК</span>`;
           }
 
           const initials = (x.full_name || '').split(' ').slice(0, 2).map(n => n[0] || '').join('').toUpperCase() || 'K';
@@ -1383,77 +1397,95 @@
         if (!r.ok) throw new Error('Не удалось загрузить данные кассира');
         const x = await r.json();
 
+        // --- Header Info ---
         document.getElementById('m-name').textContent = x.full_name;
         document.getElementById('m-pos').textContent = x.position || 'Должность не указана';
-        document.getElementById('m-branch-str').textContent = 'Филиал / БХМ: ' + (x.branch_name || 'Не указан');
-        document.getElementById('m-meta').textContent = `Табель №: ${x.tab_number || '—'} · № сотрудника: ${x.employee_number || '—'}`;
-        
+        document.getElementById('m-branch-str').textContent = '🏛️ Филиал / БХМ: ' + (x.branch_name || 'Не указан');
+        document.getElementById('m-meta').textContent = `Табель №: ${x.tab_number || '—'} · Сотрудник №: ${x.employee_number || '—'}`;
+
+        // --- Role Badge: always based on Bek vs Front operation count ---
         const badge = document.getElementById('m-role-badge');
-        if (x.cashier_type === 'front') {
-          badge.className = 'badge-role badge-front'; badge.textContent = '💳 ФРОНТ-кассир (Front > Bek)';
+        const bekCnt = x.bek_count || 0;
+        const frontCnt = x.front_count || 0;
+        if (frontCnt > bekCnt) {
+          badge.className = 'badge-role badge-front';
+          badge.textContent = `💳 ФРОНТ-кассир (ФРОНТ ${nf.format(frontCnt)} > БЭК ${nf.format(bekCnt)})`;
         } else {
-          badge.className = 'badge-role badge-back'; badge.textContent = '💼 БЭК-кассир (Bek ≥ Front)';
+          badge.className = 'badge-role badge-back';
+          badge.textContent = `💼 БЭК-кассир (БЭК ${nf.format(bekCnt)} ≥ ФРОНТ ${nf.format(frontCnt)})`;
         }
 
+        // --- HR Status Badge ---
         const hrBadge = document.getElementById('m-hr-status-badge');
         const hrBanner = document.getElementById('m-hr-banner');
+        const statusStyles = {
+          maternity: x.has_replacement
+            ? 'background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff'
+            : 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5',
+          vacation: x.has_replacement
+            ? 'background:#e0f2fe;color:#075985;border:1px solid #bae6fd'
+            : 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5',
+          temporary: 'background:#fef3c7;color:#92400e;border:1px solid #fde68a',
+          vacant: 'background:#f1f5f9;color:#475569;border:1px solid #cbd5e1',
+          active: 'background:#dcfce7;color:#166534;border:1px solid #bbf7d0'
+        };
+        const baseHrStyle = 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;';
+        const sc = x.hr_status_code || 'active';
+        hrBadge.style.cssText = baseHrStyle + (statusStyles[sc] || statusStyles.active);
+        hrBadge.textContent = x.hr_status_label || '🟢 Работает';
 
-        if (x.hr_status_code === 'maternity') {
-          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff' : 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
-          hrBadge.textContent = `🟣 ${x.hr_status_label}`;
-        } else if (x.hr_status_code === 'vacation') {
-          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#e0f2fe;color:#075985;border:1px solid #bae6fd' : 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
-          hrBadge.textContent = `🔵 ${x.hr_status_label}`;
-        } else if (x.hr_status_code === 'temporary') {
-          hrBadge.style.cssText = 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#fef3c7;color:#92400e;border:1px solid #fde68a';
-          hrBadge.textContent = `🟡 ${x.hr_status_label}`;
-        } else if (x.hr_status_code === 'vacant') {
-          hrBadge.style.cssText = 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1';
-          hrBadge.textContent = `⚪ Вакантная ставка`;
-        } else {
-          hrBadge.style.cssText = 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0';
-          hrBadge.textContent = `🟢 Работает`;
-        }
-
+        // --- HR Banner (replacement info) ---
         if (x.replacing_full_name) {
-          hrBanner.style.display = 'block';
-          hrBanner.style.background = '#fef3c7'; hrBanner.style.color = '#92400e'; hrBanner.style.border = '1px solid #fde68a';
-          hrBanner.innerHTML = `<b>🟡 Временный замещающий сотрудник</b><br>Замещает основной штатную единицу: <b>${x.replacing_full_name}</b>`;
+          hrBanner.style.cssText = 'display:block;margin-top:14px;padding:12px 16px;border-radius:12px;font-size:13px;line-height:1.5;background:#fef3c7;color:#92400e;border:1px solid #fde68a';
+          hrBanner.innerHTML = `<b>🟡 Вақтинча ўринбосар ходим</b><br>Асосий штат бирлигини алмаштираяпти: <b>${x.replacing_full_name}</b>`;
         } else if (x.replaced_by_full_name) {
-          hrBanner.style.display = 'block';
-          hrBanner.style.background = '#f3e8ff'; hrBanner.style.color = '#6b21a8'; hrBanner.style.border = '1px solid #e9d5ff';
-          hrBanner.innerHTML = `<b>🟣 Находится в отпуске/декрете (С заменой)</b><br>На её месте временно работает: <b>${x.replaced_by_full_name}</b>`;
-        } else if (x.hr_status_code !== 'active' && !x.has_replacement) {
-          hrBanner.style.display = 'block';
-          hrBanner.style.background = '#fee2e2'; hrBanner.style.color = '#991b1b'; hrBanner.style.border = '1px solid #fca5a5';
-          hrBanner.innerHTML = `<b>🔴 ⚠️ Внимание: Замена отсутствует!</b><br>Сотрудник находится в декрете/отпуске, но в штате филиала <b>отсутствует заменяющий человек</b>.`;
+          hrBanner.style.cssText = 'display:block;margin-top:14px;padding:12px 16px;border-radius:12px;font-size:13px;line-height:1.5;background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff';
+          hrBanner.innerHTML = `<b>🟣 Декрет/Та'тилда (Ўринбосар бор)</b><br>Ўрнида вақтинча ишлаяпти: <b>${x.replaced_by_full_name}</b>`;
+        } else if (sc !== 'active' && sc !== 'vacant' && !x.has_replacement) {
+          hrBanner.style.cssText = 'display:block;margin-top:14px;padding:12px 16px;border-radius:12px;font-size:13px;line-height:1.5;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
+          hrBanner.innerHTML = `<b>🔴 ⚠️ Диqqat: Ўринбосар йўq!</b><br>Ходим декрет/та'тилда, аммо филиалда <b>ўринбосар тайинланмаган</b>.`;
         } else {
           hrBanner.style.display = 'none';
         }
 
+        // --- KPI metrics ---
         document.getElementById('m-score-val').textContent = (x.efficiency_score || 0) + ' / 100';
         document.getElementById('m-score-grade').textContent = x.efficiency_grade || 'Low Load';
         document.getElementById('m-ops-val').textContent = nf.format(x.operations_count);
         document.getElementById('m-ops-daily').textContent = `${nf.format(x.operations_per_day)} опер./день`;
         document.getElementById('m-hours-val').textContent = x.hours_str;
         document.getElementById('m-days-val').textContent = `${x.days_worked} дн. (${x.days_worked_pct}%)`;
-        
-        const loadValContainer = document.getElementById('m-load-val');
-        loadValContainer.innerHTML = `${x.load_percent}% ${x.load_percent > 100 ? `<br><span style="font-size:11px;font-weight:800;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:4px">🔥 +${(x.load_percent - 100).toFixed(1)}% ortiqcha yuklama</span>` : ''}`;
+
+        const loadValEl = document.getElementById('m-load-val');
+        loadValEl.innerHTML = x.load_percent > 100
+          ? `${x.load_percent}%<br><span style="font-size:11px;font-weight:800;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:4px">🔥 +${(x.load_percent - 100).toFixed(1)}% ortiqcha yuklama</span>`
+          : `${x.load_percent}%`;
         document.getElementById('m-speed-val').textContent = `${x.avg_seconds_per_operation}с на опер.`;
 
+        // --- БЭК / ФРОНТ split progress bar ---
+        const totalOpsForSplit = bekCnt + frontCnt || 1;
+        const bekPctSplit = Math.round(bekCnt / totalOpsForSplit * 100);
+        document.getElementById('m-bek-lbl').textContent = `💼 БЭК: ${bekPctSplit}%`;
+        document.getElementById('m-front-lbl').textContent = `💳 ФРОНТ: ${100 - bekPctSplit}%`;
+        document.getElementById('m-bek-bar').style.width = bekPctSplit + '%';
+        document.getElementById('m-bek-cnt').textContent = `${nf.format(bekCnt)} БЭК операция`;
+        document.getElementById('m-front-cnt').textContent = `${nf.format(frontCnt)} ФРОНТ операция`;
+
+        // --- Operations detail table (only rows with count > 0) ---
         const topMetrics = (x.metrics || []).slice(0, 8);
         const tbody = document.getElementById('m-table-body');
-        tbody.innerHTML = (x.metrics || []).map(m => `
-          <tr>
+        tbody.innerHTML = (x.metrics || []).filter(m => m.count > 0).map(m => {
+          const isFront = m.section.includes('ФРОНТ');
+          return `<tr style="background:${isFront ? '#eff6ff' : '#f5f3ff'}">
             <td><b>${m.name}</b></td>
-            <td><span class="badge-role ${m.section.includes('ФРОНТ') ? 'badge-front' : 'badge-back'}">${m.section}</span></td>
+            <td><span class="badge-role ${isFront ? 'badge-front' : 'badge-back'}" style="font-size:10px;padding:2px 7px">${m.section}</span></td>
             <td><b>${nf.format(m.count)}</b></td>
             <td><b>${m.pct}%</b></td>
-            <td>${m.minutes} мин</td>
-          </tr>
-        `).join('');
+            <td>${nf.format(m.minutes)} мин</td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Операциялар маълумоти йўқ</td></tr>';
 
+        // --- Chart ---
         const ctx = document.getElementById('modal-chart');
         if (modalChart) { try { modalChart.destroy(); } catch(e) {} }
         modalChart = new Chart(ctx, {
@@ -1463,7 +1495,7 @@
             datasets: [{
               label: 'Доля (%)',
               data: topMetrics.map(m => m.pct),
-              backgroundColor: '#2563eb',
+              backgroundColor: topMetrics.map(m => m.section.includes('ФРОНТ') ? '#3b82f6' : '#7c3aed'),
               borderRadius: 6
             }]
           },
@@ -1475,13 +1507,11 @@
               legend: { display: false },
               tooltip: {
                 callbacks: {
-                  label: (ctx) => ` Доля: ${ctx.parsed.x}% (${nf.format(topMetrics[ctx.dataIndex].count)} опер.)`
+                  label: (ctx) => ` ${ctx.parsed.x}% (${nf.format(topMetrics[ctx.dataIndex].count)} опер.)`
                 }
               }
             },
-            scales: {
-              x: { max: 100, ticks: { callback: v => v + '%' } }
-            }
+            scales: { x: { max: 100, ticks: { callback: v => v + '%' } } }
           }
         });
 
@@ -1516,12 +1546,6 @@
 
     function setStatus(st) {
       selectedStatus = st || '';
-      if (st === '') {
-        selectedRole = '';
-        document.querySelectorAll('.pill-btn.role').forEach(b => {
-          b.classList.toggle('active', (b.dataset.role || '') === '');
-        });
-      }
       currentPage = 1;
       document.querySelectorAll('.st-pill').forEach(b => {
         b.classList.toggle('active', (b.dataset.status || '') === (st || ''));
