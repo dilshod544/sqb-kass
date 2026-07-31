@@ -449,7 +449,7 @@ def _enrich(x, detail=False):
     x['top_direction'] = x['metrics'][0]['name'] if x['metrics'] else '—'
     return x, ops
 
-def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=None, position=None, status=None):
+def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=None, position=None, status=None, branch=None):
     init_cashier_tables()
     with _connect() as c:
         if import_id is None:
@@ -591,6 +591,12 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
                 )
             ]
 
+    branches_list = sorted(list({(x.get('branch_name') or '').strip() for x in all_rows if (x.get('branch_name') or '').strip()}))
+
+    if branch and str(branch).strip():
+        b_q = str(branch).strip().lower()
+        rows = [x for x in rows if b_q in (x.get('branch_name') or '').strip().lower()]
+
     cats = {}
     allowed = BACK_GROUPS if role == 'back' else FRONT_GROUPS if role == 'front' else None
 
@@ -623,7 +629,7 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
 
     total = len(rows)
     page = max(1, page)
-    page_size = min(max(1, page_size), 100)
+    page_size = min(max(1, page_size), 200)
     start = (page - 1) * page_size
 
     total_ops = bek_tot + front_tot
@@ -643,15 +649,15 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         'bek_pct': round(bek_tot / total_ops * 100, 1) if total_ops else 0,
         'front_operations': round(front_tot),
         'front_pct': round(front_tot / total_ops * 100, 1) if total_ops else 0,
-        'back_cashiers': sum(x['cashier_type'] == 'back' for x in all_rows),
-        'front_cashiers': sum(x['cashier_type'] == 'front' for x in all_rows),
-        'universal_cashiers': sum(x['cashier_type'] == 'universal' for x in all_rows),
-        'active_cashiers': sum(x.get('hr_status_code') == 'active' for x in all_rows),
-        'vacation_cashiers': sum(x.get('hr_status_code') == 'vacation' for x in all_rows),
-        'maternity_cashiers': sum(x.get('hr_status_code') == 'maternity' for x in all_rows),
-        'temporary_cashiers': sum(x.get('hr_status_code') == 'temporary' for x in all_rows),
-        'vacant_positions': sum(x.get('hr_status_code') == 'vacant' for x in all_rows),
-        'no_replacement_cashiers': sum(x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity') for x in all_rows),
+        'back_cashiers': sum(x['cashier_type'] == 'back' for x in rows),
+        'front_cashiers': sum(x['cashier_type'] == 'front' for x in rows),
+        'universal_cashiers': sum(x['cashier_type'] == 'universal' for x in rows),
+        'active_cashiers': sum(x.get('hr_status_code') == 'active' for x in rows),
+        'vacation_cashiers': sum(x.get('hr_status_code') == 'vacation' for x in rows),
+        'maternity_cashiers': sum(x.get('hr_status_code') == 'maternity' for x in rows),
+        'temporary_cashiers': sum(x.get('hr_status_code') == 'temporary' for x in rows),
+        'vacant_positions': sum(x.get('hr_status_code') == 'vacant' for x in rows),
+        'no_replacement_cashiers': sum(x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity') for x in rows),
         'active_filter': role or 'all'
     }
 
@@ -661,6 +667,7 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         'cashiers': rows[start:start + page_size],
         'categories': categories_list,
         'positions': positions_list,
+        'branches': branches_list,
         'top_by_position': top_by_position,
         'page': page,
         'page_size': page_size,

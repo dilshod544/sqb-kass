@@ -877,6 +877,10 @@
         <select id="position-select" class="position-select" onchange="onPositionSelect()">
           <option value="">Все должности</option>
         </select>
+
+        <select id="branch-select" class="position-select" onchange="onBranchSelect()" style="min-width:220px;border-color:#a7f3d0">
+          <option value="">🏛️ Все филиалы / БХМ</option>
+        </select>
       </div>
 
       <!-- Row 2: Role Pills -->
@@ -1045,19 +1049,21 @@
   <!-- JavaScript Application Logic -->
   <script>
     const base = location.origin.includes(':') ? location.origin : `${location.protocol}//${location.hostname}:8000`;
-    let charts = [], modalChart = null, currentPage = 1, totalPages = 1, pageSize = 25, selectedRole = '', selectedStatus = '', selectedPosition = '', searchQuery = '', searchTimeout = null, globalTopByPosition = {};
+    let charts = [], modalChart = null, currentPage = 1, totalPages = 1, pageSize = 25, selectedRole = '', selectedStatus = '', selectedPosition = '', selectedBranch = '', searchQuery = '', searchTimeout = null, globalTopByPosition = {};
     const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
     function resetAllFilters() {
       selectedRole = '';
       selectedStatus = '';
       selectedPosition = '';
+      selectedBranch = '';
       searchQuery = '';
       currentPage = 1;
 
       document.getElementById('search-input').value = '';
       document.getElementById('clear-search-btn').style.display = 'none';
-      document.getElementById('position-select').value = '';
+      if (document.getElementById('position-select')) document.getElementById('position-select').value = '';
+      if (document.getElementById('branch-select')) document.getElementById('branch-select').value = '';
 
       document.querySelectorAll('.pill-btn.role').forEach(b => {
         b.classList.toggle('active', (b.dataset.role || '') === '');
@@ -1095,6 +1101,23 @@
       selectedPosition = document.getElementById('position-select').value;
       currentPage = 1;
       load();
+    }
+
+    function onBranchSelect() {
+      selectedBranch = document.getElementById('branch-select').value;
+      currentPage = 1;
+      load();
+    }
+
+    function updateBranchSelectOptions(branches) {
+      const sel = document.getElementById('branch-select');
+      if (!sel || sel.options.length > 1) return;
+      (branches || []).forEach(br => {
+        const opt = document.createElement('option');
+        opt.value = br;
+        opt.textContent = `🏛️ ${br}`;
+        sel.appendChild(opt);
+      });
     }
 
     function drawTop(labels, data) {
@@ -1217,6 +1240,7 @@
         if (selectedStatus) url += `&status=${encodeURIComponent(selectedStatus)}`;
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
         if (selectedPosition) url += `&position=${encodeURIComponent(selectedPosition)}`;
+        if (selectedBranch) url += `&branch=${encodeURIComponent(selectedBranch)}`;
 
         let r = await fetch(url);
         let d = await r.json(), s = d.summary || {};
@@ -1226,6 +1250,7 @@
         }
 
         if (d.positions) updatePositionSelectOptions(d.positions);
+        if (d.branches) updateBranchSelectOptions(d.branches);
         renderPosTopTabs(d.top_by_position);
 
         window.currentCashiersList = d.cashiers;
@@ -1233,7 +1258,8 @@
         const filterLabel = selectedRole === 'back' ? ' (БЭК)' : selectedRole === 'front' ? ' (ФРОНТ)' : selectedRole === 'universal' ? ' (Универсальные)' : '';
         const stLabel = selectedStatus ? ` · Status: ${selectedStatus}` : '';
         const posLabel = selectedPosition ? ` · ${selectedPosition}` : '';
-        document.getElementById('notice-text').textContent = `Отчёт: ${d.import.filename} · импортирован ${new Date(d.import.imported_at).toLocaleString('ru-RU')}${filterLabel}${stLabel}${posLabel}`;
+        const brLabel = selectedBranch ? ` · BXM: ${selectedBranch}` : '';
+        document.getElementById('notice-text').textContent = `Отчёт: ${d.import.filename} · импортирован ${new Date(d.import.imported_at).toLocaleString('ru-RU')}${filterLabel}${stLabel}${posLabel}${brLabel}`;
         
         document.getElementById('lbl-cash').textContent = selectedRole ? `Кассиров${filterLabel}` : 'Всего кассиров';
         document.getElementById('k-cash').textContent = s.cashiers || 0;
@@ -1244,7 +1270,7 @@
         document.getElementById('k-ops-summary').textContent = nf.format(s.operations || 0);
         document.getElementById('k-hours-sub').textContent = `${s.hours || 0} ч. работы`;
 
-        document.getElementById('chart-top-title').textContent = `Топ 10 кассиров по операциям${posLabel}`;
+        document.getElementById('chart-top-title').textContent = `Топ 10 кассиров по операциям${posLabel}${brLabel}`;
         document.getElementById('chart-cats-title').textContent = `Структура операций (%) ${filterLabel}`;
 
         try {
@@ -1327,7 +1353,7 @@
             <td><b>${x.tab_number || '—'}</b></td>
             <td>
               <b>${x.position || '—'}</b>
-              <br><small class="muted">${x.branch_name || '—'}</small>
+              <br><span style="font-size:11px;font-weight:700;color:#047857;background:#ecfdf5;border:1px solid #a7f3d0;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:3px">🏛️ ${x.branch_name || 'Markaziy apparat'}</span>
             </td>
             <td><b>${nf.format(x.days_worked)}</b> <small class="muted">(${x.days_worked_pct}%)</small></td>
             <td><b>${nf.format(x.operations_count)}</b></td>
