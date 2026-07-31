@@ -538,25 +538,27 @@ def save_cashier_status_import(filename, parsed):
     return {'import_id': iid, 'imported': len(parsed['records'])}
 
 def cashier_role(row):
+    pos = norm(row.get('position') or '').replace(' ', '')
     b = float(row.get('bek_count', 0) or 0)
     f = float(row.get('front_count', 0) or 0)
-    pos = norm(row.get('position') or '')
 
-    if f > 0 and b == 0:
+    # 1. Position Title Priority
+    if any(k in pos for k in ('универсал', 'universal', 'назоратчи', 'nazoratchi', 'контролер')):
+        return 'universal'
+    elif any(k in pos for k in ('мудир', 'mudir', 'инкасса', 'inkassa', 'кассамудири', 'бэк', 'back')):
+        return 'back'
+    elif any(k in pos for k in ('фронт', 'front', 'операционист')):
         return 'front'
+
+    # 2. Operations Breakdown Priority
+    if f > 0 and b > 0:
+        return 'universal'
     elif b > 0 and f == 0:
         return 'back'
-    elif f > 0 and b > 0:
-        if f >= 2 * b:
-            return 'front'
-        elif b >= 2 * f:
-            return 'back'
-        else:
-            return 'universal'
-    else:
-        if 'универсал' in pos or 'universal' in pos or 'назоратчи' in pos or 'nazoratchi' in pos or 'контролер' in pos:
-            return 'universal'
+    elif f > 0 and b == 0:
         return 'front'
+    else:
+        return 'universal'
 
 
 def compute_efficiency_score(x):
@@ -769,11 +771,11 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
     if role and str(role).strip():
         r_q = str(role).strip().lower()
         if r_q == 'front':
-            rows = [x for x in rows if x['cashier_type'] == 'front' or (x.get('front_count', 0) > 0 and x.get('front_pct', 0) >= 50.0)]
+            rows = [x for x in rows if x['cashier_type'] == 'front']
         elif r_q == 'back':
-            rows = [x for x in rows if x['cashier_type'] == 'back' or (x.get('bek_count', 0) > 0 and x.get('bek_pct', 0) >= 50.0)]
+            rows = [x for x in rows if x['cashier_type'] == 'back']
         elif r_q == 'universal':
-            rows = [x for x in rows if x['cashier_type'] == 'universal' or (x.get('front_count', 0) > 0 and x.get('bek_count', 0) > 0) or 'универсал' in norm(x.get('position', '')) or 'nazoratchi' in norm(x.get('position', ''))]
+            rows = [x for x in rows if x['cashier_type'] == 'universal']
 
 
 
