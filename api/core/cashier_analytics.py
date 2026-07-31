@@ -182,11 +182,6 @@ def parse_cashiers_xlsx(path: str | Path):
 
         get = lambda col_num: row[col_num - 1] if col_num and len(row) >= col_num else None
 
-        # Check full row text to skip Summary / Total rows
-        row_str_full = norm(' '.join(str(c or '') for c in row[:10]))
-        if any(w in row_str_full for w in ('итого', 'total')) or ('жам' in row_str_full and not any(w in row_str_full for w in ('назарова', 'ризаева', 'халимова', 'усманова', 'олимова', 'каримов', 'рахимов'))):
-            continue
-
         name = str(get(col_fio) or '').strip()
         tab_num = str(get(col_tab) or get(1) or '').strip()
         pos = str(get(col_pos) or '').strip()
@@ -194,9 +189,12 @@ def parse_cashiers_xlsx(path: str | Path):
         bcode = str(get(col_bcode) or '').strip() if col_bcode else ''
         bname = str(get(col_bname) or '').strip() if col_bname else ''
 
-        # Skip rows where full_name is empty, numeric (like 9023), or summary marker
+        # Skip ONLY explicit summary header/total cells or empty rows
         n_name = norm(name).replace(' ', '')
-        if not name or len(name) < 3 or name.replace('.', '').isdigit() or name in ('-', '—', 'None', 'null', 'nan') or any(k in n_name for k in ('жами', 'итого', 'total', 'фиш', 'фио', 'сони', 'минут', 'номер', '№')):
+        n_tab = norm(tab_num).replace(' ', '')
+        if n_name in ('жами', 'итого', 'total', 'всего', 'сони', 'минут', 'фиш', 'фио') or n_tab in ('жами', 'итого', 'total', 'всего', 'номер', '№'):
+            continue
+        if not name or name in ('-', '—', 'None', 'null', 'nan') or (name.isdigit() and len(name) > 6):
             continue
 
         branch_str = ''

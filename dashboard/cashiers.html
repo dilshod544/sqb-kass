@@ -1359,10 +1359,11 @@
             <td><b>${nf.format(x.operations_count)}</b></td>
             <td>${nf.format(x.operations_per_day)}</td>
             <td>
-              <div style="font-weight:800;color:${loadColor}">${x.load_percent}%</div>
+              <div style="font-weight:850;color:${loadColor}">${x.load_percent}%</div>
               <div style="height:5px;background:#e2e8f0;border-radius:3px;margin-top:3px;width:60px;overflow:hidden">
                 <div style="height:100%;background:${loadColor};width:${Math.min(x.load_percent, 100)}%"></div>
               </div>
+              ${x.load_percent > 100 ? `<div style="margin-top:3px"><span style="font-size:10px;font-weight:800;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:2px 6px;border-radius:6px;display:inline-block">🔥 +${(x.load_percent - 100).toFixed(1)}% ortiqcha yuklama</span></div>` : ''}
             </td>
             <td>${nf.format(x.bek_count)} <small class="muted">(${x.bek_pct}%)</small> / ${nf.format(x.front_count)} <small class="muted">(${x.front_pct}%)</small></td>
             <td><b>${x.avg_seconds_per_operation}s</b></td>
