@@ -517,6 +517,7 @@
           throw new Error(data.detail || 'Ошибка импорта файла.');
         }
 
+        resultBox.style.display = 'block';
         resultBox.className = 'result-box success';
         const importedCount = data.imported || data.rows_count || 0;
         resultBox.innerHTML = `
@@ -527,6 +528,7 @@
           </a>
         `;
       } catch (err) {
+        resultBox.style.display = 'block';
         resultBox.className = 'result-box error';
         resultBox.innerHTML = `<b>❌ Ошибка при импорте:</b><br>${err.message}`;
       } finally {
