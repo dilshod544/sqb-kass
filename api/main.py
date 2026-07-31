@@ -23,6 +23,7 @@ from contextlib import asynccontextmanager
 # Ensure api directory is in python path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
