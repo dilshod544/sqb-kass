@@ -124,12 +124,23 @@ def parse_cashiers_xlsx(path: str | Path):
     header = None
     for r_idx in range(min(30, len(all_rows))):
         row_vals = [str(cell or '') for cell in all_rows[r_idx]]
-        if any(norm(cell) in ('фиш', 'фио') for cell in row_vals):
-            header = r_idx + 1  # 1-based index
+        for cell in row_vals:
+            c_clean = norm(cell).replace(' ', '')
+            if any(k in c_clean for k in ('фиш', 'фио', 'ф.и.ш', 'ф.и.о')) or ('ф' in c_clean and 'и' in c_clean and ('ш' in c_clean or 'о' in c_clean)):
+                header = r_idx + 1
+                break
+        if header:
             break
 
     if not header:
-        raise ValueError('Не найдена обязательная колонка «ФИШ». Ожидается отчёт кассиров.')
+        for r_idx in range(min(30, len(all_rows))):
+            row_str = norm(' '.join(str(c or '') for c in all_rows[r_idx])).replace(' ', '')
+            if any(k in row_str for k in ('табел', 'лавозим', 'ишкуни', 'амалиет', 'операци')):
+                header = r_idx + 1
+                break
+
+    if not header:
+        header = 1
 
     data_start = header + 1
     # Check if the row immediately after header is a secondary sub-header (e.g. Сони / Минут)
@@ -139,7 +150,7 @@ def parse_cashiers_xlsx(path: str | Path):
             data_start += 1
 
     # Dynamic Header Detection for Column Mapping
-    header_row_vals = [norm(c) for c in all_rows[header - 1]]
+    header_row_vals = [norm(c).replace(' ', '') for c in all_rows[header - 1]]
     
     col_fio = None
     col_tab = None
@@ -150,7 +161,7 @@ def parse_cashiers_xlsx(path: str | Path):
     col_days = None
 
     for c_idx, n_c in enumerate(header_row_vals):
-        if not col_fio and any(w in n_c for w in ('фиш', 'фио', 'ф и ш', 'ф.и.ш.')):
+        if not col_fio and (any(k in n_c for k in ('фиш', 'фио', 'ф.и.ш', 'ф.и.о')) or ('ф' in n_c and 'и' in n_c and ('ш' in n_c or 'о' in n_c))):
             col_fio = c_idx + 1
         elif not col_tab and 'табел' in n_c:
             col_tab = c_idx + 1
@@ -158,17 +169,17 @@ def parse_cashiers_xlsx(path: str | Path):
             col_pos = c_idx + 1
         elif not col_note and any(w in n_c for w in ('изох', 'статус', 'бележка', 'примечание')):
             col_note = c_idx + 1
-        elif not col_bcode and any(w in n_c for w in ('филиал коди', 'мфо', 'код филиала')):
+        elif not col_bcode and any(w in n_c for w in ('филиалкоди', 'мфо', 'кодфилиала')):
             col_bcode = c_idx + 1
-        elif not col_bname and any(w in n_c for w in ('бхм', 'филиал номи', 'наименование филиала', 'подразделение')):
+        elif not col_bname and any(w in n_c for w in ('бхм', 'филиалноми', 'наименование', 'подразделение')):
             col_bname = c_idx + 1
-        elif not col_days and any(w in n_c for w in ('иш куни', 'ишлаган кун')):
+        elif not col_days and any(w in n_c for w in ('ишкуни', 'ишлаганкун')):
             col_days = c_idx + 1
 
     # Fallback to standard schema columns if not detected
     if not col_fio: col_fio = 3
-    if not col_tab: col_tab = 4
-    if not col_pos: col_pos = 6
+    if not col_tab: col_tab = 4 if col_fio != 4 else 1
+    if not col_pos: col_pos = 6 if col_fio != 6 else 2
     if not col_days: col_days = 5
 
     records = []
@@ -187,10 +198,10 @@ def parse_cashiers_xlsx(path: str | Path):
         bcode = str(get(col_bcode) or '').strip() if col_bcode else ''
         bname = str(get(col_bname) or '').strip() if col_bname else ''
 
-        # Skip summary/header/filter lines
-        n_name = norm(name)
-        n_tab = norm(tab_num)
-        if not name or n_name in ('жами', 'итого', 'total', 'фиш', 'фио', 'сони', 'минут') or n_tab in ('номер', '№', 'жами', 'итого', 'total'):
+        # Skip summary/header/filter/dash lines
+        n_name = norm(name).replace(' ', '')
+        n_tab = norm(tab_num).replace(' ', '')
+        if not name or name in ('-', '—', 'None', 'null', 'nan', '0', '0.0') or any(k in n_name for k in ('жами', 'итого', 'total', 'фиш', 'фио', 'сони', 'минут')):
             continue
 
         branch_str = ''
