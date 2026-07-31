@@ -48,6 +48,8 @@ SCHEMA = [
 BACK_GROUPS = {'Амалга оширилган операциялар сони (кирим-чиқим)', 'Банкоматга пул қўйиш', 'Касса мудири', 'Кечки кассир', 'Назоратчи кассир ролини бажарганда', 'Купюра санаш', 'Кирим, чиқим ҳужжатини текшириш, расмийлаштириш'}
 FRONT_GROUPS = {'ВАЛЮТА 100$', 'ВАЛЮТА 100,01–1000$', 'ВАЛЮТА 1000,01–5000$', 'ВАЛЮТА 10000$', 'ВАЛЮТА 5000,01–10000$', 'Коммунал тўловлар (кирим-чиқим)', 'Пластик карта тарқатиш', 'Пластикдан нақд пул ечиш'}
 EXCLUDED_GROUPS = {'БЕК фарқ', 'ФРОНТ фарқ', 'Жами (БЕК)', 'Жами (ФРОНТ)', 'Жами амалиётлар', 'Жами', 'БЕК фарк', 'ФРОНТ фарк', 'Жами БЕК', 'Жами ФРОНТ'}
+CORE = {'employee_number', 'total_marker', 'full_name', 'tab_number', 'days_worked', 'position', 'operations_count', 'operations_minutes', 'load_percent', 'load_difference', 'bek_count', 'bek_minutes', 'front_count', 'front_minutes'}
+
 
 
 def init_cashier_tables():
@@ -58,12 +60,17 @@ def init_cashier_tables():
         c.execute("CREATE TABLE IF NOT EXISTS cashier_statuses (id INTEGER PRIMARY KEY AUTOINCREMENT,import_id INTEGER NOT NULL REFERENCES cashier_status_imports(id) ON DELETE CASCADE,branch_name TEXT,position TEXT,full_name TEXT NOT NULL,status_code TEXT NOT NULL,status_label TEXT NOT NULL,raw_note TEXT,replacing_full_name TEXT,replaced_by_full_name TEXT,has_replacement INTEGER NOT NULL DEFAULT 0)")
 
 def parse_cashiers_xlsx(path: str | Path):
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
+    path_str = str(path)
+    if path_str.lower().endswith('.csv'):
+        import csv
+        with open(path, 'r', encoding='utf-8-sig', errors='ignore') as f:
+            all_rows = list(csv.reader(f))
+    else:
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        all_rows = list(ws.iter_rows(values_only=True))
+        wb.close()
 
-    # Read rows sequentially to avoid openpyxl read-only iterator resets
-    all_rows = list(ws.iter_rows(values_only=True))
-    wb.close()
 
     if not all_rows:
         raise ValueError('Excel-файл пуст.')
@@ -145,27 +152,16 @@ def save_cashier_import(filename, parsed):
 
 def parse_cashier_status_xlsx(path: str | Path):
     path_str = str(path)
-    tmp_copied = None
-
-    # Ensure openpyxl opens .csv files by copying to a temp .xlsx if needed
     if path_str.lower().endswith('.csv'):
-        import shutil, tempfile
-        tmp_dir = tempfile.mkdtemp(prefix='status_parse_')
-        tmp_copied = Path(tmp_dir) / 'file_copy.xlsx'
-        shutil.copy(path, tmp_copied)
-        target_path = tmp_copied
+        import csv
+        with open(path, 'r', encoding='utf-8-sig', errors='ignore') as f:
+            all_rows = list(csv.reader(f))
     else:
-        target_path = path
-
-    try:
-        wb = openpyxl.load_workbook(target_path, read_only=True, data_only=True)
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
         ws = wb.active
         all_rows = list(ws.iter_rows(values_only=True))
         wb.close()
-    finally:
-        if tmp_copied and tmp_copied.exists():
-            import shutil
-            shutil.rmtree(tmp_copied.parent, ignore_errors=True)
+
 
     if not all_rows:
         raise ValueError('Excel-файл пуст.')
