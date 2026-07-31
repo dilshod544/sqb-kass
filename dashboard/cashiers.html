@@ -1386,32 +1386,35 @@
 
         document.getElementById('m-name').textContent = x.full_name;
         document.getElementById('m-pos').textContent = x.position || 'Должность не указана';
-        document.getElementById('m-branch-str').textContent = 'Филиал: ' + (x.branch_name || 'Не указан');
-        document.getElementById('m-meta').textContent = `№ сотрудника: ${x.employee_number || '—'} · Табель: ${x.tab_number || '—'}`;
+        document.getElementById('m-branch-str').textContent = 'Филиал / БХМ: ' + (x.branch_name || 'Не указан');
+        document.getElementById('m-meta').textContent = `Табель №: ${x.tab_number || '—'} · № сотрудника: ${x.employee_number || '—'}`;
         
         const badge = document.getElementById('m-role-badge');
         if (x.cashier_type === 'front') {
-          badge.className = 'badge-role badge-front'; badge.textContent = 'ФРОНТ-кассир';
+          badge.className = 'badge-role badge-front'; badge.textContent = '💳 ФРОНТ-кассир (Front > Bek)';
         } else if (x.cashier_type === 'back') {
-          badge.className = 'badge-role badge-back'; badge.textContent = 'БЭК-кассир';
+          badge.className = 'badge-role badge-back'; badge.textContent = '💼 БЭК-кассир (Bek > Front)';
         } else {
-          badge.className = 'badge-role badge-universal'; badge.textContent = 'Универсальный';
+          badge.className = 'badge-role badge-universal'; badge.textContent = '🛡️ Универсальный кассир';
         }
 
         const hrBadge = document.getElementById('m-hr-status-badge');
         const hrBanner = document.getElementById('m-hr-banner');
 
         if (x.hr_status_code === 'maternity') {
-          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff' : 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
+          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff' : 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
           hrBadge.textContent = `🟣 ${x.hr_status_label}`;
         } else if (x.hr_status_code === 'vacation') {
-          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#e0f2fe;color:#075985;border:1px solid #bae6fd' : 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
+          hrBadge.style.cssText = x.has_replacement ? 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#e0f2fe;color:#075985;border:1px solid #bae6fd' : 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5';
           hrBadge.textContent = `🔵 ${x.hr_status_label}`;
         } else if (x.hr_status_code === 'temporary') {
-          hrBadge.style.cssText = 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#fef3c7;color:#92400e;border:1px solid #fde68a';
+          hrBadge.style.cssText = 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#fef3c7;color:#92400e;border:1px solid #fde68a';
           hrBadge.textContent = `🟡 ${x.hr_status_label}`;
+        } else if (x.hr_status_code === 'vacant') {
+          hrBadge.style.cssText = 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1';
+          hrBadge.textContent = `⚪ Вакантная ставка`;
         } else {
-          hrBadge.style.cssText = 'font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0';
+          hrBadge.style.cssText = 'font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0';
           hrBadge.textContent = `🟢 Работает`;
         }
 
@@ -1437,7 +1440,9 @@
         document.getElementById('m-ops-daily').textContent = `${nf.format(x.operations_per_day)} опер./день`;
         document.getElementById('m-hours-val').textContent = x.hours_str;
         document.getElementById('m-days-val').textContent = `${x.days_worked} дн. (${x.days_worked_pct}%)`;
-        document.getElementById('m-load-val').textContent = `${x.load_percent}%`;
+        
+        const loadValContainer = document.getElementById('m-load-val');
+        loadValContainer.innerHTML = `${x.load_percent}% ${x.load_percent > 100 ? `<br><span style="font-size:11px;font-weight:800;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 7px;border-radius:6px;display:inline-block;margin-top:4px">🔥 +${(x.load_percent - 100).toFixed(1)}% ortiqcha yuklama</span>` : ''}`;
         document.getElementById('m-speed-val').textContent = `${x.avg_seconds_per_operation}с на опер.`;
 
         const topMetrics = (x.metrics || []).slice(0, 8);

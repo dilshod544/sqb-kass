@@ -538,27 +538,22 @@ def save_cashier_status_import(filename, parsed):
     return {'import_id': iid, 'imported': len(parsed['records'])}
 
 def cashier_role(row):
-    pos = norm(row.get('position') or '').replace(' ', '')
     b = float(row.get('bek_count', 0) or 0)
     f = float(row.get('front_count', 0) or 0)
+    pos = norm(row.get('position') or '').replace(' ', '')
 
-    # 1. Position Title Priority
-    if any(k in pos for k in ('универсал', 'universal', 'назоратчи', 'nazoratchi', 'контролер')):
-        return 'universal'
-    elif any(k in pos for k in ('мудир', 'mudir', 'инкасса', 'inkassa', 'кассамудири', 'бэк', 'back')):
-        return 'back'
-    elif any(k in pos for k in ('фронт', 'front', 'операционист')):
+    # Primary Role: Compare Front vs Back operations count
+    if f > b:
         return 'front'
-
-    # 2. Operations Breakdown Priority
-    if f > 0 and b > 0:
-        return 'universal'
-    elif b > 0 and f == 0:
+    elif b > f:
         return 'back'
-    elif f > 0 and b == 0:
-        return 'front'
     else:
-        return 'universal'
+        # Fallback to position title if equal or 0 operations
+        if any(k in pos for k in ('мудир', 'mudir', 'инкасса', 'inkassa', 'бэк', 'back')):
+            return 'back'
+        elif any(k in pos for k in ('универсал', 'universal', 'назоратчи', 'nazoratchi')):
+            return 'universal'
+        return 'front'
 
 
 def compute_efficiency_score(x):
@@ -775,7 +770,7 @@ def cashier_analytics(import_id=None, page=1, page_size=25, role=None, search=No
         elif r_q == 'back':
             rows = [x for x in rows if x['cashier_type'] == 'back']
         elif r_q == 'universal':
-            rows = [x for x in rows if x['cashier_type'] == 'universal']
+            rows = [x for x in rows if any(k in norm(x.get('position', '')).replace(' ', '') for k in ('универсал', 'universal', 'назоратчи', 'nazoratchi', 'контролер'))]
 
 
 
