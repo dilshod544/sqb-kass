@@ -210,11 +210,96 @@
     .badge-back { background: #fef3c7; color: #b45309; }
     .badge-universal { background: #dcfce7; color: #15803d; }
     
-    @media(max-width:850px) {
-      .hero { display: block; }
-      .upload { margin-top: 15px; }
-      .kpis, .modal-kpi-grid { grid-template-columns: repeat(2, 1fr); }
-      .grid { grid-template-columns: 1fr; }
+    /* Enhanced Pagination Styles */
+    .pagination-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 16px 20px;
+      background: #ffffff;
+      border-top: 1px solid #e2e9f2;
+      border-bottom-left-radius: 18px;
+      border-bottom-right-radius: 18px;
+    }
+    .pagination-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .pagination-size-select {
+      padding: 6px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e293b;
+      background: #fff;
+      cursor: pointer;
+      outline: none;
+    }
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .page-btn {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 8px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .page-btn:hover:not(:disabled) {
+      border-color: #2563eb;
+      color: #2563eb;
+      background: #eff6ff;
+    }
+    .page-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #2563eb;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+    }
+    .page-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .page-dots {
+      padding: 0 4px;
+      color: #94a3b8;
+      font-weight: 800;
+    }
+    .page-jump-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #64748b;
+      margin-left: 8px;
+    }
+    .page-jump-input {
+      width: 52px;
+      height: 34px;
+      text-align: center;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
     }
   </style>
 </head>
@@ -324,10 +409,28 @@
         </thead>
         <tbody id="rows"></tbody>
       </table>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px">
-        <button class="btn" id="prev" onclick="go(-1)">← Назад</button>
-        <span class="muted" id="pager">Страница —</span>
-        <button class="btn" id="next" onclick="go(1)">Вперёд →</button>
+      <div class="pagination-container">
+        <div class="pagination-info">
+          <span id="pagination-info-text">Загрузка...</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span>Показывать по:</span>
+            <select class="pagination-size-select" id="page-size-select" onchange="setPageSize(this.value)">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+          <div class="pagination-controls" id="pagination-buttons"></div>
+          <div class="page-jump-container">
+            <span>Перейти:</span>
+            <input type="number" id="page-jump-input" class="page-jump-input" min="1" onkeydown="if(event.key==='Enter') goToPage(this.value)">
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -423,7 +526,7 @@
 
   <script>
     const base = location.origin.includes(':') ? location.origin : `${location.protocol}//${location.hostname}:8000`;
-    let charts = [], modalChart = null, currentPage = 1, totalPages = 1, selectedRole = '', selectedStatus = '', selectedPosition = '', searchQuery = '', searchTimeout = null, globalTopByPosition = {};
+    let charts = [], modalChart = null, currentPage = 1, totalPages = 1, pageSize = 25, selectedRole = '', selectedStatus = '', selectedPosition = '', searchQuery = '', searchTimeout = null, globalTopByPosition = {};
     const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
     function destroy() {
@@ -583,7 +686,7 @@
 
     async function load() {
       try {
-        let url = base + `/api/cashiers/analytics?page=${currentPage}&page_size=25`;
+        let url = base + `/api/cashiers/analytics?page=${currentPage}&page_size=${pageSize}`;
         if (selectedRole) url += `&role=${encodeURIComponent(selectedRole)}`;
         if (selectedStatus) url += `&status=${encodeURIComponent(selectedStatus)}`;
         if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
@@ -628,9 +731,7 @@
 
         currentPage = d.page || 1;
         totalPages = d.total_pages || 1;
-        document.getElementById('pager').textContent = `Страница ${currentPage} из ${totalPages} · ${d.total || 0} кассиров`;
-        document.getElementById('prev').disabled = currentPage <= 1;
-        document.getElementById('next').disabled = currentPage >= totalPages;
+        renderPaginationControls(currentPage, totalPages, d.total || 0, pageSize);
 
         if (!d.cashiers || d.cashiers.length === 0) {
           document.getElementById('rows').innerHTML = `
@@ -839,13 +940,81 @@
       load();
     }
 
-    function go(delta) {
-      let next = currentPage + delta;
-      if (next >= 1 && next <= totalPages) {
-        currentPage = next;
+    function setPageSize(sz) {
+      pageSize = parseInt(sz) || 25;
+      currentPage = 1;
+      load();
+    }
+
+    function goToPage(p) {
+      p = parseInt(p);
+      if (isNaN(p)) return;
+      if (p < 1) p = 1;
+      if (p > totalPages) p = totalPages;
+      if (p !== currentPage) {
+        currentPage = p;
         load();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const tableEl = document.getElementById('rows');
+        if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+    }
+
+    function renderPaginationControls(page, totalPages, total, size) {
+      const container = document.getElementById('pagination-buttons');
+      const infoEl = document.getElementById('pagination-info-text');
+      if (!container) return;
+
+      const startIdx = total > 0 ? (page - 1) * size + 1 : 0;
+      const endIdx = Math.min(page * size, total);
+      if (infoEl) {
+        infoEl.textContent = total > 0 ? `Показано ${startIdx}–${endIdx} из ${total} кассиров` : 'Кассиры не найдены';
+      }
+
+      let html = '';
+      html += `<button class="page-btn" onclick="goToPage(1)" ${page <= 1 ? 'disabled' : ''} title="Первая страница">«</button>`;
+      html += `<button class="page-btn" onclick="goToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''} title="Предыдущая">‹</button>`;
+
+      let pages = [];
+      const delta = 2;
+      for (let i = Math.max(2, page - delta); i <= Math.min(totalPages - 1, page + delta); i++) {
+        pages.push(i);
+      }
+
+      if (page - delta > 2) {
+        pages.unshift('...');
+      }
+      pages.unshift(1);
+
+      if (page + delta < totalPages - 1) {
+        pages.push('...');
+      }
+      if (totalPages > 1) {
+        pages.push(totalPages);
+      }
+
+      pages.forEach(p => {
+        if (p === '...') {
+          html += `<span class="page-dots">...</span>`;
+        } else {
+          const activeClass = p === page ? 'active' : '';
+          html += `<button class="page-btn ${activeClass}" onclick="goToPage(${p})">${p}</button>`;
+        }
+      });
+
+      html += `<button class="page-btn" onclick="goToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''} title="Следующая">›</button>`;
+      html += `<button class="page-btn" onclick="goToPage(${totalPages})" ${page >= totalPages ? 'disabled' : ''} title="Последняя страница">»</button>`;
+
+      container.innerHTML = html;
+
+      const jumpInput = document.getElementById('page-jump-input');
+      if (jumpInput) {
+        jumpInput.value = page;
+        jumpInput.max = totalPages;
+      }
+    }
+
+    function go(delta) {
+      goToPage(currentPage + delta);
     }
 
     lucide.createIcons();
