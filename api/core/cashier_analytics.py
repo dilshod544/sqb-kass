@@ -123,34 +123,21 @@ def parse_cashiers_xlsx(path: str | Path):
 
     header = None
     for r_idx in range(min(30, len(all_rows))):
-        row_vals = [str(cell or '') for cell in all_rows[r_idx]]
-        for cell in row_vals:
-            c_clean = norm(cell).replace(' ', '')
-            if any(k in c_clean for k in ('фиш', 'фио', 'ф.и.ш', 'ф.и.о')) or ('ф' in c_clean and 'и' in c_clean and ('ш' in c_clean or 'о' in c_clean)):
-                header = r_idx + 1
-                break
-        if header:
+        row_str = norm(' '.join(str(c or '') for c in all_rows[r_idx]))
+        if any(k in row_str for k in ('фиш', 'фио', 'табел', 'лавозим', 'ф и ш', 'ф и о')):
+            header = r_idx + 1
             break
-
-    if not header:
-        for r_idx in range(min(30, len(all_rows))):
-            row_str = norm(' '.join(str(c or '') for c in all_rows[r_idx])).replace(' ', '')
-            if any(k in row_str for k in ('табел', 'лавозим', 'ишкуни', 'амалиет', 'операци')):
-                header = r_idx + 1
-                break
-
     if not header:
         header = 1
 
     data_start = header + 1
-    # Check if the row immediately after header is a secondary sub-header (e.g. Сони / Минут)
     if data_start <= len(all_rows):
         sub_row_str = ' '.join(str(cell or '') for cell in all_rows[data_start - 1])
         if any(w in norm(sub_row_str) for w in ('сони', 'минут', 'кун')):
             data_start += 1
 
     # Dynamic Header Detection for Column Mapping
-    header_row_vals = [norm(c).replace(' ', '') for c in all_rows[header - 1]]
+    header_cells = [str(c or '').strip() for c in all_rows[header - 1]]
     
     col_fio = None
     col_tab = None
@@ -160,23 +147,26 @@ def parse_cashiers_xlsx(path: str | Path):
     col_bname = None
     col_days = None
 
-    for c_idx, n_c in enumerate(header_row_vals):
-        if not col_fio and (any(k in n_c for k in ('фиш', 'фио', 'ф.и.ш', 'ф.и.о')) or ('ф' in n_c and 'и' in n_c and ('ш' in n_c or 'о' in n_c))):
+    for c_idx, raw_c in enumerate(header_cells):
+        n_c = norm(raw_c).replace(' ', '')
+        if not n_c:
+            continue
+        if not col_fio and any(k in n_c for k in ('фиш', 'фио', 'ф.и.ш', 'ф.и.о', 'fish', 'fio', 'f.i.sh', 'ф.и.ш.')):
             col_fio = c_idx + 1
         elif not col_tab and 'табел' in n_c:
             col_tab = c_idx + 1
-        elif not col_pos and 'лавозим' in n_c:
+        elif not col_pos and any(k in n_c for k in ('лавозим', 'должность', 'position')):
             col_pos = c_idx + 1
         elif not col_note and any(w in n_c for w in ('изох', 'статус', 'бележка', 'примечание')):
             col_note = c_idx + 1
         elif not col_bcode and any(w in n_c for w in ('филиалкоди', 'мфо', 'кодфилиала')):
             col_bcode = c_idx + 1
-        elif not col_bname and any(w in n_c for w in ('бхм', 'филиалноми', 'наименование', 'подразделение')):
+        elif not col_bname and any(w in n_c for w in ('бхмноми', 'филиалноми', 'наименованиефилиала', 'подразделение')) and 'коди' not in n_c:
             col_bname = c_idx + 1
-        elif not col_days and any(w in n_c for w in ('ишкуни', 'ишлаганкун')):
+        elif not col_days and any(w in n_c for w in ('ишкуни', 'ишлаганкун', 'дней')):
             col_days = c_idx + 1
 
-    # Fallback to standard schema columns if not detected
+    # Strict fallbacks to standard Kassirlar bo'yicha Excel schema if not detected
     if not col_fio: col_fio = 3
     if not col_tab: col_tab = 4 if col_fio != 4 else 1
     if not col_pos: col_pos = 6 if col_fio != 6 else 2
@@ -191,6 +181,12 @@ def parse_cashiers_xlsx(path: str | Path):
             continue
 
         get = lambda col_num: row[col_num - 1] if col_num and len(row) >= col_num else None
+
+        # Check full row text to skip Summary / Total rows
+        row_str_full = norm(' '.join(str(c or '') for c in row[:10]))
+        if any(w in row_str_full for w in ('итого', 'total')) or ('жам' in row_str_full and not any(w in row_str_full for w in ('назарова', 'ризаева', 'халимова', 'усманова', 'олимова', 'каримов', 'рахимов'))):
+            continue
+
         name = str(get(col_fio) or '').strip()
         tab_num = str(get(col_tab) or get(1) or '').strip()
         pos = str(get(col_pos) or '').strip()
@@ -198,10 +194,9 @@ def parse_cashiers_xlsx(path: str | Path):
         bcode = str(get(col_bcode) or '').strip() if col_bcode else ''
         bname = str(get(col_bname) or '').strip() if col_bname else ''
 
-        # Skip summary/header/filter/dash lines
+        # Skip rows where full_name is empty, numeric (like 9023), or summary marker
         n_name = norm(name).replace(' ', '')
-        n_tab = norm(tab_num).replace(' ', '')
-        if not name or name in ('-', '—', 'None', 'null', 'nan', '0', '0.0') or any(k in n_name for k in ('жами', 'итого', 'total', 'фиш', 'фио', 'сони', 'минут')):
+        if not name or len(name) < 3 or name.replace('.', '').isdigit() or name in ('-', '—', 'None', 'null', 'nan') or any(k in n_name for k in ('жами', 'итого', 'total', 'фиш', 'фио', 'сони', 'минут', 'номер', '№')):
             continue
 
         branch_str = ''
@@ -555,8 +550,10 @@ def _enrich(x, detail=False):
     real_ops_total = sum(v.get('count', 0) for v in real_metrics.values()) or x.get('operations_count', 0) or 1
 
     total_ops = x.get('operations_count', 0) or 1
-    x['bek_pct'] = round((x.get('bek_count', 0) / total_ops) * 100, 1)
-    x['front_pct'] = round((x.get('front_count', 0) / total_ops) * 100, 1)
+    bek_cnt = float(x.get('bek_count', 0) or 0)
+    front_cnt = float(x.get('front_count', 0) or 0)
+    x['bek_pct'] = min(100.0, round((bek_cnt / total_ops) * 100, 1)) if x.get('operations_count') else 0.0
+    x['front_pct'] = min(100.0, round((front_cnt / total_ops) * 100, 1)) if x.get('operations_count') else 0.0
     x['days_worked_pct'] = round((x.get('days_worked', 0) / 22) * 100, 1)
 
     eff = compute_efficiency_score(x)
