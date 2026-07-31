@@ -52,12 +52,59 @@ CORE = {'employee_number', 'total_marker', 'full_name', 'tab_number', 'days_work
 
 
 
+def parse_hr_status(raw_note: str, position: str = ''):
+    raw_note = str(raw_note or '').strip()
+    position = str(position or '').strip()
+    n_str = norm(f"{raw_note} {position}")
+    
+    if any(w in n_str for w in ('мехнат тат', 'мехнаттат', 'отпуск', 'отпускда', 'отпуска')):
+        code, label = 'vacation', 'В отпуске (Меҳнат татили)'
+    elif any(w in n_str for w in ('декрет', 'декрет2', 'декрет1', 'декретда')):
+        code, label = 'maternity', 'В декрете'
+    elif any(w in n_str for w in ('вакт', 'вактинча', 'замещ', 'вактинчалик')):
+        code, label = 'temporary', 'Временное замещение'
+    elif any(w in n_str for w in ('вакант', 'свобод', 'bo\'sh', 'bosh')):
+        code, label = 'vacant', 'Вакантная ставка'
+    else:
+        code, label = 'active', 'Работает'
+
+    has_replacement = 1
+    if code in ('vacation', 'maternity'):
+        if any(w in n_str for w in ('без замен', 'заменасиз', 'эгасиз', 'уринбосарсиз', 'замена йук')):
+            has_replacement = 0
+        elif any(w in n_str for w in ('ога', 'орнига', 'замен', 'заменил')):
+            has_replacement = 1
+
+    return {
+        'status_code': code,
+        'status_label': label,
+        'has_replacement': has_replacement,
+        'raw_note': raw_note
+    }
+
 def init_cashier_tables():
     with _connect() as c:
         c.execute("CREATE TABLE IF NOT EXISTS cashier_imports (id INTEGER PRIMARY KEY AUTOINCREMENT,filename TEXT,imported_at TEXT NOT NULL,rows_count INTEGER NOT NULL,report_label TEXT)")
-        c.execute("CREATE TABLE IF NOT EXISTS cashier_reports (id INTEGER PRIMARY KEY AUTOINCREMENT,import_id INTEGER NOT NULL REFERENCES cashier_imports(id) ON DELETE CASCADE,tab_number TEXT,full_name TEXT NOT NULL,position TEXT,days_worked REAL,operations_count REAL NOT NULL DEFAULT 0,operations_minutes REAL NOT NULL DEFAULT 0,bek_count REAL NOT NULL DEFAULT 0,bek_minutes REAL NOT NULL DEFAULT 0,front_count REAL NOT NULL DEFAULT 0,front_minutes REAL NOT NULL DEFAULT 0,metrics_json TEXT NOT NULL DEFAULT '{}')")
+        c.execute("CREATE TABLE IF NOT EXISTS cashier_reports (id INTEGER PRIMARY KEY AUTOINCREMENT,import_id INTEGER NOT NULL REFERENCES cashier_imports(id) ON DELETE CASCADE,tab_number TEXT,full_name TEXT NOT NULL,position TEXT,days_worked REAL,operations_count REAL NOT NULL DEFAULT 0,operations_minutes REAL NOT NULL DEFAULT 0,bek_count REAL NOT NULL DEFAULT 0,bek_minutes REAL NOT NULL DEFAULT 0,front_count REAL NOT NULL DEFAULT 0,front_minutes REAL NOT NULL DEFAULT 0,branch_name TEXT,raw_note TEXT,hr_status_code TEXT,hr_status_label TEXT,replacing_full_name TEXT,replaced_by_full_name TEXT,has_replacement INTEGER DEFAULT 1,metrics_json TEXT NOT NULL DEFAULT '{}')")
         c.execute("CREATE TABLE IF NOT EXISTS cashier_status_imports (id INTEGER PRIMARY KEY AUTOINCREMENT,filename TEXT,imported_at TEXT NOT NULL,rows_count INTEGER NOT NULL)")
         c.execute("CREATE TABLE IF NOT EXISTS cashier_statuses (id INTEGER PRIMARY KEY AUTOINCREMENT,import_id INTEGER NOT NULL REFERENCES cashier_status_imports(id) ON DELETE CASCADE,branch_name TEXT,position TEXT,full_name TEXT NOT NULL,status_code TEXT NOT NULL,status_label TEXT NOT NULL,raw_note TEXT,replacing_full_name TEXT,replaced_by_full_name TEXT,has_replacement INTEGER NOT NULL DEFAULT 0)")
+        
+        # Migrations for cashier_reports
+        cols = [col[1] for col in c.execute("PRAGMA table_info(cashier_reports)").fetchall()]
+        if 'branch_name' not in cols:
+            c.execute("ALTER TABLE cashier_reports ADD COLUMN branch_name TEXT")
+        if 'raw_note' not in cols:
+            c.execute("ALTER TABLE cashier_reports ADD COLUMN raw_note TEXT")
+        if 'hr_status_code' not in cols:
+            c.execute("ALTER TABLE cashier_reports ADD COLUMN hr_status_code TEXT")
+        if 'hr_status_label' not in cols:
+            c.execute("ALTER TABLE cashier_reports ADD COLUMN hr_status_label TEXT")
+        if 'replacing_full_name' not in cols:
+            c.execute("ALTER TABLE cashier_reports ADD COLUMN replacing_full_name TEXT")
+        if 'replaced_by_full_name' not in cols:
+            c.execute("ALTER TABLE cashier_reports ADD COLUMN replaced_by_full_name TEXT")
+        if 'has_replacement' not in cols:
+            c.execute("ALTER TABLE cashier_reports ADD COLUMN has_replacement INTEGER DEFAULT 1")
 
 def parse_cashiers_xlsx(path: str | Path):
     path_str = str(path)
@@ -71,7 +118,6 @@ def parse_cashiers_xlsx(path: str | Path):
         all_rows = list(ws.iter_rows(values_only=True))
         wb.close()
 
-
     if not all_rows:
         raise ValueError('Excel-файл пуст.')
 
@@ -83,7 +129,7 @@ def parse_cashiers_xlsx(path: str | Path):
             break
 
     if not header:
-        raise ValueError('Не найдена обязательная колонка C «ФИШ». Ожидается отчёт Kassirlar bo‘yicha.')
+        raise ValueError('Не найдена обязательная колонка «ФИШ». Ожидается отчёт кассиров.')
 
     data_start = header + 1
     # Check if the row immediately after header is a secondary sub-header (e.g. Сони / Минут)
@@ -91,6 +137,39 @@ def parse_cashiers_xlsx(path: str | Path):
         sub_row_str = ' '.join(str(cell or '') for cell in all_rows[data_start - 1])
         if any(w in norm(sub_row_str) for w in ('сони', 'минут', 'кун')):
             data_start += 1
+
+    # Dynamic Header Detection for Column Mapping
+    header_row_vals = [norm(c) for c in all_rows[header - 1]]
+    
+    col_fio = None
+    col_tab = None
+    col_pos = None
+    col_note = None
+    col_bcode = None
+    col_bname = None
+    col_days = None
+
+    for c_idx, n_c in enumerate(header_row_vals):
+        if not col_fio and any(w in n_c for w in ('фиш', 'фио', 'ф и ш', 'ф.и.ш.')):
+            col_fio = c_idx + 1
+        elif not col_tab and 'табел' in n_c:
+            col_tab = c_idx + 1
+        elif not col_pos and 'лавозим' in n_c:
+            col_pos = c_idx + 1
+        elif not col_note and any(w in n_c for w in ('изох', 'статус', 'бележка', 'примечание')):
+            col_note = c_idx + 1
+        elif not col_bcode and any(w in n_c for w in ('филиал коди', 'мфо', 'код филиала')):
+            col_bcode = c_idx + 1
+        elif not col_bname and any(w in n_c for w in ('бхм', 'филиал номи', 'наименование филиала', 'подразделение')):
+            col_bname = c_idx + 1
+        elif not col_days and any(w in n_c for w in ('иш куни', 'ишлаган кун')):
+            col_days = c_idx + 1
+
+    # Fallback to standard schema columns if not detected
+    if not col_fio: col_fio = 3
+    if not col_tab: col_tab = 4
+    if not col_pos: col_pos = 6
+    if not col_days: col_days = 5
 
     records = []
     errors = []
@@ -100,25 +179,54 @@ def parse_cashiers_xlsx(path: str | Path):
         if not row or not any(v not in (None, '') for v in row):
             continue
 
-        get = lambda col: row[col - 1] if len(row) >= col else None
-        name = str(get(3) or '').strip()
-        emp_num = str(get(1) or '').strip()
+        get = lambda col_num: row[col_num - 1] if col_num and len(row) >= col_num else None
+        name = str(get(col_fio) or '').strip()
+        tab_num = str(get(col_tab) or get(1) or '').strip()
+        pos = str(get(col_pos) or '').strip()
+        note = str(get(col_note) or '').strip() if col_note else ''
+        bcode = str(get(col_bcode) or '').strip() if col_bcode else ''
+        bname = str(get(col_bname) or '').strip() if col_bname else ''
 
         # Skip summary/header/filter lines
         n_name = norm(name)
-        n_emp = norm(emp_num)
-        if not name or n_name in ('жами', 'итого', 'total', 'фиш', 'фио', 'сони', 'минут') or n_emp in ('номер', '№', 'жами', 'итого', 'total'):
+        n_tab = norm(tab_num)
+        if not name or n_name in ('жами', 'итого', 'total', 'фиш', 'фио', 'сони', 'минут') or n_tab in ('номер', '№', 'жами', 'итого', 'total'):
             continue
 
-        rec = {'metrics': {}}
+        branch_str = ''
+        if bcode and bname:
+            branch_str = f"{bcode} - {bname}"
+        elif bname:
+            branch_str = bname
+        elif bcode:
+            branch_str = bcode
+
+        hr = parse_hr_status(note, pos)
+
+        rec = {
+            'full_name': name,
+            'tab_number': tab_num,
+            'position': pos,
+            'days_worked': num(get(col_days)),
+            'branch_name': branch_str,
+            'raw_note': note,
+            'hr_status_code': hr['status_code'],
+            'hr_status_label': hr['status_label'],
+            'has_replacement': hr['has_replacement'],
+            'metrics': {}
+        }
+
+        # Parse SCHEMA metrics
         for title, col, key, kind in SCHEMA:
             v = get(col)
             if kind == 'text':
-                rec[key] = str(v).strip() if v is not None else ''
+                if key not in rec or not rec[key]:
+                    rec[key] = str(v).strip() if v is not None else ''
             else:
                 value = num(v)
                 if key in CORE or key in ('load_percent', 'load_difference'):
-                    rec[key] = value
+                    if key not in rec or rec[key] == 0:
+                        rec[key] = value
                 else:
                     m = rec['metrics'].setdefault(title, {})
                     m[kind] = value
@@ -126,7 +234,7 @@ def parse_cashiers_xlsx(path: str | Path):
         records.append(rec)
 
     if not records:
-        raise ValueError(f'После строки шапки {header} не найдено валидных строк кассиров в колонке C.')
+        raise ValueError(f'После строки шапки {header} не найдено валидных строк кассиров.')
 
     columns_desc = [f'{get_column_letter(col)}: {t}' for t, col, _, _ in SCHEMA]
     return {'records': records, 'errors': errors, 'header_rows': [header, header + 1], 'columns': columns_desc}
@@ -136,18 +244,29 @@ def save_cashier_import(filename, parsed):
         iid = c.execute('INSERT INTO cashier_imports(filename,imported_at,rows_count) VALUES(?,?,?)',
                         (filename, datetime.now(timezone.utc).isoformat(), len(parsed['records']))).lastrowid
         for r in parsed['records']:
-            c.execute('INSERT INTO cashier_reports(import_id,tab_number,full_name,position,days_worked,operations_count,operations_minutes,bek_count,bek_minutes,front_count,front_minutes,metrics_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-                      (iid, r.get('tab_number'), r['full_name'], r.get('position'), r.get('days_worked', 0),
-                       r.get('operations_count', 0), r.get('operations_minutes', 0),
-                       r.get('bek_count', 0), r.get('bek_minutes', 0),
-                       r.get('front_count', 0), r.get('front_minutes', 0),
-                       json.dumps({
-                           'employee_number': r.get('employee_number'),
-                           'total_marker': r.get('total_marker'),
-                           'load_percent': r.get('load_percent', 0),
-                           'load_difference': r.get('load_difference', 0),
-                           'operations': r['metrics']
-                       }, ensure_ascii=False)))
+            c.execute('''INSERT INTO cashier_reports(
+                import_id, tab_number, full_name, position, days_worked,
+                operations_count, operations_minutes, bek_count, bek_minutes,
+                front_count, front_minutes, branch_name, raw_note,
+                hr_status_code, hr_status_label, replacing_full_name, replaced_by_full_name, has_replacement,
+                metrics_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (
+                iid, r.get('tab_number'), r['full_name'], r.get('position'), r.get('days_worked', 0),
+                r.get('operations_count', 0), r.get('operations_minutes', 0),
+                r.get('bek_count', 0), r.get('bek_minutes', 0),
+                r.get('front_count', 0), r.get('front_minutes', 0),
+                r.get('branch_name', ''), r.get('raw_note', ''),
+                r.get('hr_status_code', 'active'), r.get('hr_status_label', 'Работает'),
+                r.get('replacing_full_name'), r.get('replaced_by_full_name'), r.get('has_replacement', 1),
+                json.dumps({
+                    'employee_number': r.get('employee_number'),
+                    'total_marker': r.get('total_marker'),
+                    'load_percent': r.get('load_percent', 0),
+                    'load_difference': r.get('load_difference', 0),
+                    'operations': r.get('metrics', {})
+                }, ensure_ascii=False)
+            ))
     return {'import_id': iid, 'imported': len(parsed['records']), 'header_rows': parsed['header_rows']}
 
 def parse_cashier_status_xlsx(path: str | Path):
@@ -739,11 +858,11 @@ def cashier_detail(report_id):
         x['replaced_by_full_name'] = st_info.get('replaced_by_full_name')
         x['has_replacement'] = st_info.get('has_replacement', 0)
     else:
-        x['hr_status_code'] = 'active'
-        x['hr_status_label'] = 'Работает'
-        x['branch_name'] = ''
-        x['replacing_full_name'] = None
-        x['replaced_by_full_name'] = None
-        x['has_replacement'] = 1
+        x['hr_status_code'] = x.get('hr_status_code') or 'active'
+        x['hr_status_label'] = x.get('hr_status_label') or 'Работает'
+        x['branch_name'] = x.get('branch_name') or ''
+        x['replacing_full_name'] = x.get('replacing_full_name')
+        x['replaced_by_full_name'] = x.get('replaced_by_full_name')
+        x['has_replacement'] = x.get('has_replacement', 1)
 
     return x
