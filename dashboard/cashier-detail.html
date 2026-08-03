@@ -1,234 +1,874 @@
 <!doctype html>
-<html lang="ru">
+<html lang="uz">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Профиль кассира</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kassir Profili va Analytics — SQB Arena</title>
+
+  <!-- Fonts & Libraries -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;850&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
   <style>
-    body {
-      margin: 0;
-      background: #f5f7fb;
-      color: #162238;
-      font: 14px Inter, Arial, sans-serif;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --border-hover: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-gradient: linear-gradient(135deg, #2563eb, #3b82f6);
+      --emerald-gradient: linear-gradient(135deg, #059669, #10b981);
+      --purple-gradient: linear-gradient(135deg, #7c3aed, #8b5cf6);
+      --amber-gradient: linear-gradient(135deg, #d97706, #f59e0b);
+      --rose-gradient: linear-gradient(135deg, #e11d48, #f43f5e);
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 4px 20px -2px rgba(15, 23, 42, 0.08);
+      --shadow-lg: 0 20px 35px -5px rgba(15, 23, 42, 0.12);
     }
+
+    body {
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 60px;
+    }
+
+    /* Header */
     header {
-      height: 60px;
-      background: #fff;
-      border-bottom: 1px solid #e4eaf2;
+      height: 64px;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      padding: 0 28px;
+      justify-content: space-between;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
     }
-    a {
-      color: #2864ce;
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--primary);
       text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      transition: all 0.15s ease;
+    }
+
+    .back-link:hover {
+      background: #dbeafe;
+      transform: translateX(-2px);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 850;
+      color: var(--text);
+    }
+
+    /* Layout Wrapper */
+    .container {
+      max-width: 1280px;
+      width: 100%;
+      margin: 28px auto;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Hero Card */
+    .hero-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 6px;
+      background: var(--primary-gradient);
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .hero-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .avatar-lg {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: var(--primary-gradient);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: 26px;
+      font-weight: 850;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+      flex-shrink: 0;
+    }
+
+    .hero-details h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 26px;
+      font-weight: 850;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 6px;
+    }
+
+    .hero-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 12px;
       font-weight: 700;
     }
-    .wrap {
-      max-width: 1180px;
-      margin: 25px auto;
-      padding: 0 20px;
+
+    .badge-role-front {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
     }
-    .hero, .card {
-      background: #fff;
-      border: 1px solid #e2e9f2;
-      border-radius: 18px;
-      padding: 20px;
-      box-shadow: 0 5px 17px #2030500d;
+
+    .badge-role-back {
+      background: #f5f3ff;
+      color: #6d28d9;
+      border: 1px solid #ddd6fe;
     }
-    .hero h1 {
-      margin: 6px 0;
-      font-size: 29px;
+
+    .badge-branch {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
     }
-    .muted { color: #6f7d90; }
-    .kpis {
+
+    .hero-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      padding: 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .meta-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .meta-val {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    /* HR Status Banner */
+    .hr-banner {
+      padding: 14px 18px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* KPI Highlight Grid */
+    .kpi-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 14px;
-      margin: 16px 0;
+      gap: 18px;
     }
-    .label {
-      font-size: 11px;
+
+    @media (max-width: 1024px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 640px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .kpi-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-hover);
+    }
+
+    .kpi-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    .kpi-title {
+      font-size: 12px;
+      font-weight: 700;
       text-transform: uppercase;
-      color: #748198;
-      font-weight: bold;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
     }
-    .val {
-      font-size: 25px;
-      font-weight: 800;
-      margin-top: 8px;
+
+    .kpi-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 850;
+      color: var(--text);
+      line-height: 1;
     }
-    .grid {
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Progress bar */
+    .progress-track {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+    }
+
+    /* Main 2-Col Grid */
+    .grid-2col {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 24px;
     }
-    .chart { height: 340px; }
-    table {
-      border-collapse: collapse;
+
+    @media (max-width: 992px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chart-box {
+      height: 450px;
+      position: relative;
+    }
+
+    /* Data Table Styling */
+    .table-wrapper {
       width: 100%;
+      overflow-x: auto;
+      border-radius: 14px;
+      border: 1px solid var(--border);
     }
-    th, td {
-      padding: 11px;
-      border-bottom: 1px solid #edf1f6;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
       text-align: left;
+      font-size: 13px;
     }
+
     th {
+      background: #f8fafc;
+      padding: 12px 16px;
       font-size: 11px;
+      font-weight: 800;
       text-transform: uppercase;
-      color: #748198;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
     }
-    @media(max-width:700px) {
-      .kpis, .grid { grid-template-columns: 1fr; }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      color: var(--text);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Score Badge */
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .score-top { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .score-opt { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .score-avg { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .score-low { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+    /* Loader */
+    .loading-state {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
+
+  <!-- Header -->
   <header>
-    <a href="/dashboard/cashiers.html">← Все кассиры</a>
+    <a href="/dashboard/cashiers.html" class="back-link">
+      <i data-lucide="arrow-left" style="width:16px;height:16px"></i>
+      Барча кассирлар рўйхатига қайтиш
+    </a>
+    <div class="brand-title">SQB Cashier Intelligence</div>
   </header>
 
-  <main class="wrap">
-    <section class="hero">
-      <div class="muted" id="meta">Загрузка профиля…</div>
-      <h1 id="name">—</h1>
-      <div id="sub" class="muted"></div>
-    </section>
+  <!-- Main Container -->
+  <main class="container">
 
-    <section class="kpis">
-      <div class="card">
-        <div class="label">Место в рейтинге</div>
-        <div id="rank" class="val">—</div>
-      </div>
-      <div class="card">
-        <div class="label">Операций</div>
-        <div id="ops" class="val">—</div>
-      </div>
-      <div class="card">
-        <div class="label">Операций в день</div>
-        <div id="perday" class="val">—</div>
-      </div>
-      <div class="card">
-        <div class="label">Скорость</div>
-        <div id="speed" class="val">—</div>
-      </div>
-    </section>
+    <!-- Loading State -->
+    <div id="loading" class="loading-state">
+      <div class="spinner"></div>
+      <b style="font-size:16px;color:var(--text)">Кассир профили юкланмоқда...</b>
+    </div>
 
-    <section class="grid">
-      <div class="card">
-        <h3>Профиль операций</h3>
-        <div class="chart"><canvas id="chart"></canvas></div>
+    <!-- Error State -->
+    <div id="error-card" class="card" style="display:none;background:#fef2f2;border-color:#fca5a5;color:#991b1b;text-align:center;padding:40px">
+      <i data-lucide="alert-triangle" style="width:48px;height:48px;margin:0 auto 12px;color:#dc2626"></i>
+      <h2 style="font-size:20px;margin-bottom:8px">Маълумотларни олишда хатолик</h2>
+      <p id="error-msg" style="font-size:14px;color:#7f1d1d"></p>
+      <div style="margin-top:20px">
+        <a href="/dashboard/cashiers.html" class="back-link">Опцияни қайта уриниш</a>
       </div>
+    </div>
 
-      <div class="card">
-        <h3>Ключевые показатели</h3>
-        <table id="core"></table>
-      </div>
-    </section>
+    <!-- Profile Content -->
+    <div id="content" style="display:none;flex-direction:column;gap:24px">
 
-    <section class="card" style="margin-top:16px">
-      <h3>Все операции кассира</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Операция</th>
-            <th>Раздел</th>
-            <th>Количество</th>
-            <th>Доля (%)</th>
-            <th>Минут</th>
-          </tr>
-        </thead>
-        <tbody id="metrics"></tbody>
-      </table>
-    </section>
+      <!-- Hero Header Card -->
+      <section class="hero-card">
+        <div class="hero-top">
+          <div class="hero-left">
+            <div class="avatar-lg" id="avatar">—</div>
+            <div class="hero-details">
+              <h1 id="full-name">—</h1>
+              <div class="hero-badges">
+                <span id="role-badge" class="badge-item badge-role-back">💼 БЭК-кассир</span>
+                <span id="branch-badge" class="badge-item badge-branch">🏛️ BXM / Filial</span>
+              </div>
+            </div>
+          </div>
+          <div id="score-box" class="score-badge score-top">
+            ⭐ <span id="score-num">—</span> / 100
+          </div>
+        </div>
+
+        <!-- HR Status Banner -->
+        <div id="hr-banner" class="hr-banner" style="display:none"></div>
+
+        <!-- Meta Grid -->
+        <div class="hero-meta-grid">
+          <div class="meta-item">
+            <span class="meta-label">Табель рақами</span>
+            <span class="meta-val" id="meta-tab">—</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Сотрудник №</span>
+            <span class="meta-val" id="meta-emp">—</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Лавозими</span>
+            <span class="meta-val" id="meta-pos">—</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Ишлаган куни</span>
+            <span class="meta-val" id="meta-days">—</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 KPI Highlight Cards -->
+      <section class="kpi-grid">
+        <!-- Card 1: Score -->
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-title">Samaradorlik Balli</span>
+            <div class="kpi-icon" style="background:var(--emerald-gradient)">
+              <i data-lucide="award" style="width:20px;height:20px"></i>
+            </div>
+          </div>
+          <div class="kpi-val" id="kpi-score-val">—</div>
+          <div class="kpi-sub" id="kpi-score-grade">Baho: —</div>
+          <div class="progress-track">
+            <div id="kpi-score-bar" class="progress-fill" style="background:#10b981;width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Card 2: Operations -->
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-title">Жами Операциялар</span>
+            <div class="kpi-icon" style="background:var(--primary-gradient)">
+              <i data-lucide="layers" style="width:20px;height:20px"></i>
+            </div>
+          </div>
+          <div class="kpi-val" id="kpi-ops-val">—</div>
+          <div class="kpi-sub" id="kpi-ops-perday">Кунига: — опер.</div>
+          <div class="progress-track">
+            <div id="kpi-ops-bar" class="progress-fill" style="background:#3b82f6;width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Card 3: Workload -->
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-title">Юклама Даражаси</span>
+            <div class="kpi-icon" style="background:var(--amber-gradient)">
+              <i data-lucide="activity" style="width:20px;height:20px"></i>
+            </div>
+          </div>
+          <div class="kpi-val" id="kpi-load-val">—</div>
+          <div class="kpi-sub" id="kpi-load-sub">Норма: 100%</div>
+          <div class="progress-track">
+            <div id="kpi-load-bar" class="progress-fill" style="background:#f59e0b;width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Card 4: Speed -->
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-title">Операция Тезлиги</span>
+            <div class="kpi-icon" style="background:var(--purple-gradient)">
+              <i data-lucide="zap" style="width:20px;height:20px"></i>
+            </div>
+          </div>
+          <div class="kpi-val" id="kpi-speed-val">—</div>
+          <div class="kpi-sub" id="kpi-speed-hours">Иш соати: —</div>
+          <div class="progress-track">
+            <div id="kpi-speed-bar" class="progress-fill" style="background:#8b5cf6;width:80%"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 Column Grid -->
+      <section class="grid-2col">
+        <!-- Chart Card -->
+        <div class="card">
+          <div class="card-title">
+            <span>📊 Операциялар Профили Tahlili</span>
+          </div>
+          <div class="chart-box">
+            <canvas id="opsChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Key Metrics Table Card -->
+        <div class="card">
+          <div class="card-title">
+            <span>⚙️ Асосий Кўрсаткичлар</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <tbody id="core-metrics-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Full Operations Detail Table -->
+      <section class="card">
+        <div class="card-title">
+          <span>📋 Ходим Бажараётган Барча Операциялар Тўлиқ Рўйхати</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Операция номи</th>
+                <th>Бўлим (Тип)</th>
+                <th>Сони</th>
+                <th>Улуш (%)</th>
+                <th>Вақт (минут)</th>
+              </tr>
+            </thead>
+            <tbody id="all-ops-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
   </main>
 
   <script>
-    const id = new URLSearchParams(location.search).get('id');
-    const base = location.origin.includes(':') ? location.origin : `${location.protocol}//${location.hostname}:8000`;
+    const urlParams = new URLSearchParams(window.location.search);
+    const cashierId = urlParams.get('id');
+    const baseApi = window.location.origin.includes(':') 
+      ? window.location.origin 
+      : `${window.location.protocol}//${window.location.hostname}:8000`;
+
     const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
-    if (!id) {
-      document.getElementById('name').textContent = 'ID кассира не указан';
-      document.getElementById('meta').textContent = 'Выберите кассира из общего списка.';
+    if (!cashierId) {
+      showError('Кассир ID-си кўрсатилмаган. Илтимос, рўйхатдан қайта танланг.');
     } else {
-      fetch(base + '/api/cashiers/' + id)
-        .then(r => {
-          if (!r.ok) throw Error('Профиль не найден');
-          return r.json();
-        })
-        .then(x => {
-          let statusInfoStr = `Статус: ${x.hr_status_label || 'Работает'}`;
-          if (x.replacing_full_name) {
-            statusInfoStr += ` (Временно замещает: ${x.replacing_full_name})`;
-          } else if (x.replaced_by_full_name) {
-            statusInfoStr += ` (Её замещает: ${x.replaced_by_full_name})`;
-          } else if (x.hr_status_code !== 'active' && !x.has_replacement) {
-            statusInfoStr += ` ⚠️ (Замена отсутствует!)`;
-          }
+      fetchCashierDetail(cashierId);
+    }
 
-          document.title = x.full_name + ' — аналитика';
-          document.getElementById('name').textContent = x.full_name;
-          document.getElementById('meta').textContent = 'Углублённая аналитика кассира · ' + (x.filename || '') + (x.branch_name ? ` · ${x.branch_name}` : '');
-          document.getElementById('sub').innerHTML = `<b>${statusInfoStr}</b><br>№ сотрудника: ${x.employee_number || '—'} · Табель: ${x.tab_number || '—'} · ${x.position || '—'} · рабочих дней: ${x.days_worked || 0} (${x.days_worked_pct || 0}% от нормы) · Нагрузка: ${x.load_percent || 0}%`;
-          document.getElementById('rank').textContent = '#' + x.rank_by_operations + ' / ' + (x.percentile ? Math.round(x.percentile) : 0) + ' перцентиль';
-          document.getElementById('ops').textContent = nf.format(x.operations_count);
-          document.getElementById('perday').textContent = x.operations_per_day;
-          document.getElementById('speed').textContent = x.avg_seconds_per_operation + ' сек';
-          
-          const score = x.efficiency_score || 0;
-          const scoreBg = score >= 85 ? 'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0' :
-                          score >= 70 ? 'background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd' :
-                          score >= 50 ? 'background:#fef3c7;color:#b45309;border:1px solid #fde68a' :
-                          'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5';
+    async function fetchCashierDetail(id) {
+      try {
+        const resp = await fetch(`${baseApi}/api/cashiers/${id}`);
+        if (!resp.ok) {
+          throw new Error('Кассир маълумотлари топилмади.');
+        }
+        const data = await resp.json();
+        renderCashierProfile(data);
+      } catch (err) {
+        showError(err.message);
+      }
+    }
 
-          document.getElementById('core').innerHTML = `
-            <tr><th>Балл Samaradorlik</th><td><span style="font-weight:800;padding:3px 10px;border-radius:8px;${scoreBg}">⭐ ${score} / 100 (${x.efficiency_grade || ''})</span></td></tr>
-            <tr><th>HR Статус</th><td><b>${x.hr_status_label || 'Работает'}</b> ${x.replacing_full_name ? '<br><small class="muted">Замещает: ' + x.replacing_full_name + '</small>' : x.replaced_by_full_name ? '<br><small class="muted">Её замещает: ' + x.replaced_by_full_name + '</small>' : (!x.has_replacement && x.hr_status_code !== 'active') ? '<br><small style="color:#dc2626;font-weight:bold">⚠️ Замена отсутствует</small>' : ''}</td></tr>
-            <tr><th>Филиал</th><td>${x.branch_name || 'Не указан'}</td></tr>
-            <tr><th>Рабочих минут</th><td>${nf.format(x.operations_minutes)} (${x.hours_str || ''})</td></tr>
-            <tr><th>Нагрузка %</th><td><b style="color:${x.load_percent > 100 ? '#dc2626' : '#16a34a'}">${x.load_percent || 0}%</b></td></tr>
-            <tr><th>БЭК-операции</th><td>${nf.format(x.bek_count)} (${x.bek_pct || 0}%) / ${nf.format(x.bek_minutes)} минут</td></tr>
-            <tr><th>ФРОНТ-операции</th><td>${nf.format(x.front_count)} (${x.front_pct || 0}%) / ${nf.format(x.front_minutes)} минут</td></tr>
-            <tr><th>Среднее время</th><td>${x.avg_seconds_per_operation} сек. на операцию</td></tr>
-          `;
+    function showError(msg) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('error-card').style.display = 'block';
+      document.getElementById('error-msg').textContent = msg;
+    }
 
-          const m_list = x.metrics || [];
-          document.getElementById('metrics').innerHTML = m_list.map(m => `
+    function renderCashierProfile(x) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'flex';
+
+      // Page Title
+      document.title = `${x.full_name} — Аналитика profili`;
+
+      // Hero Elements
+      const initials = (x.full_name || '').split(' ').slice(0, 2).map(n => n[0] || '').join('').toUpperCase() || 'K';
+      document.getElementById('avatar').textContent = initials;
+      document.getElementById('full-name').textContent = x.full_name;
+
+      // Role & Branch Badges
+      const roleBadge = document.getElementById('role-badge');
+      if (x.cashier_type === 'front') {
+        roleBadge.className = 'badge-item badge-role-front';
+        roleBadge.textContent = '💳 ФРОНТ-кассир';
+      } else {
+        roleBadge.className = 'badge-item badge-role-back';
+        roleBadge.textContent = '💼 БЭК-кассир';
+      }
+
+      document.getElementById('branch-badge').textContent = `🏛️ ${cleanBranchName(x.branch_name)}`;
+
+      // Score Badge
+      const score = x.efficiency_score || 0;
+      const scoreBox = document.getElementById('score-box');
+      document.getElementById('score-num').textContent = score;
+      if (score >= 85) scoreBox.className = 'score-badge score-top';
+      else if (score >= 70) scoreBox.className = 'score-badge score-opt';
+      else if (score >= 50) scoreBox.className = 'score-badge score-avg';
+      else scoreBox.className = 'score-badge score-low';
+
+      // HR Banner
+      const hrBanner = document.getElementById('hr-banner');
+      const sc = x.hr_status_code;
+      if (x.replacing_full_name) {
+        hrBanner.style.display = 'flex';
+        hrBanner.style.background = '#fef3c7';
+        hrBanner.style.color = '#92400e';
+        hrBanner.style.border = '1px solid #fde68a';
+        hrBanner.innerHTML = `🟡 <b>Вақтинча ўринбосар ходим:</b> ${x.full_name} асосий штатдаги <b>${x.replacing_full_name}</b> ўрнини эгаллаган.`;
+      } else if (x.replaced_by_full_name) {
+        hrBanner.style.display = 'flex';
+        hrBanner.style.background = '#f3e8ff';
+        hrBanner.style.color = '#6b21a8';
+        hrBanner.style.border = '1px solid #e9d5ff';
+        hrBanner.innerHTML = `🟣 <b>Декрет/Таътилда (Ўринбосар бор):</b> ${x.full_name} ўрнида вақтинча <b>${x.replaced_by_full_name}</b> ишламоқда.`;
+      } else if (sc !== 'active' && sc !== 'vacant' && !x.has_replacement) {
+        hrBanner.style.display = 'flex';
+        hrBanner.style.background = '#fee2e2';
+        hrBanner.style.color = '#991b1b';
+        hrBanner.style.border = '1px solid #fca5a5';
+        hrBanner.innerHTML = `🔴 <b>⚠️ Диққат: Ўринбосар йўқ!</b> Ходим декрет/таътилда, аммо вақтинчалик <b>ўринбосар тайинланмаган</b>.`;
+      } else {
+        hrBanner.style.display = 'none';
+      }
+
+      // Meta Grid
+      document.getElementById('meta-tab').textContent = x.tab_number || '—';
+      document.getElementById('meta-emp').textContent = x.employee_number || '—';
+      document.getElementById('meta-pos').textContent = x.position || '—';
+      document.getElementById('meta-days').textContent = `${x.days_worked || 0} кун (${x.days_worked_pct || 0}% нормага нисбатан)`;
+
+      // KPI Highlight Cards
+      document.getElementById('kpi-score-val').textContent = score;
+      document.getElementById('kpi-score-grade').textContent = `Баҳо: ${x.efficiency_grade || 'Low Load'}`;
+      document.getElementById('kpi-score-bar').style.width = `${Math.min(score, 100)}%`;
+
+      document.getElementById('kpi-ops-val').textContent = nf.format(x.operations_count);
+      document.getElementById('kpi-ops-perday').textContent = `Кунига ўртача: ${x.operations_per_day || 0} опер.`;
+      document.getElementById('kpi-ops-bar').style.width = `${Math.min((x.operations_count / 15000) * 100, 100)}%`;
+
+      document.getElementById('kpi-load-val').textContent = `${x.load_percent || 0}%`;
+      if (x.load_percent > 100) {
+        document.getElementById('kpi-load-sub').innerHTML = `<span style="color:#dc2626;font-weight:800">🔥 +${(x.load_percent - 100).toFixed(1)}% ортиқча юклама</span>`;
+      } else {
+        document.getElementById('kpi-load-sub').textContent = `Нормага нисбатан: ${x.load_percent || 0}%`;
+      }
+      document.getElementById('kpi-load-bar').style.width = `${Math.min(x.load_percent, 100)}%`;
+
+      document.getElementById('kpi-speed-val').textContent = `${x.avg_seconds_per_operation || 0} сония`;
+      document.getElementById('kpi-speed-hours').textContent = `Жами: ${x.hours_str || '0 ч 0 мин'}`;
+
+      // Core Metrics Table
+      const coreTbody = document.getElementById('core-metrics-body');
+      coreTbody.innerHTML = `
+        <tr>
+          <th>Рейтинг (Ўрни)</th>
+          <td><b>#${x.rank_by_operations || '—'}</b> (${x.percentile || 0}-перцентиль)</td>
+        </tr>
+        <tr>
+          <th>HR Статуси</th>
+          <td><b>${x.hr_status_label || '🟢 Ишлаяпти'}</b></td>
+        </tr>
+        <tr>
+          <th>Филиал / БХМ</th>
+          <td>${x.branch_name || 'Не указан'}</td>
+        </tr>
+        <tr>
+          <th>Ишлаган вақти</th>
+          <td><b>${nf.format(x.operations_minutes)} минут</b> (${x.hours_str || ''})</td>
+        </tr>
+        <tr>
+          <th>БЭК-операциялар</th>
+          <td><b>${nf.format(x.bek_count)}</b> (${x.bek_pct || 0}%) / ${nf.format(x.bek_minutes)} мин</td>
+        </tr>
+        <tr>
+          <th>ФРОНТ-операциялар</th>
+          <td><b>${nf.format(x.front_count)}</b> (${x.front_pct || 0}%) / ${nf.format(x.front_minutes)} мин</td>
+        </tr>
+        <tr>
+          <th>Ўртача вақт</th>
+          <td>${x.avg_seconds_per_operation} сония (1 операция учун)</td>
+        </tr>
+      `;
+
+      // All Operations Detailed Table
+      const mList = x.metrics || [];
+      const allOpsTbody = document.getElementById('all-ops-body');
+      if (mList.length === 0) {
+        allOpsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">Операциялар маълумоти йўқ</td></tr>`;
+      } else {
+        allOpsTbody.innerHTML = mList.map(m => {
+          const isFront = m.section.includes('ФРОНТ');
+          const badgeClass = isFront ? 'badge-role-front' : 'badge-role-back';
+          return `
             <tr>
               <td><b>${m.name}</b></td>
-              <td><span class="muted">${m.section}</span></td>
+              <td><span class="badge-item ${badgeClass}">${m.section}</span></td>
               <td><b>${nf.format(m.count)}</b></td>
-              <td><b style="color:#2864ce">${m.pct}%</b></td>
+              <td><b style="color:var(--primary)">${m.pct}%</b></td>
               <td>${nf.format(m.minutes)} мин</td>
             </tr>
-          `).join('') || '<tr><td colspan="5">Дополнительных операций нет</td></tr>';
+          `;
+        }).join('');
+      }
 
-          let m = m_list.slice(0, 10);
-          new Chart(document.getElementById('chart'), {
-            type: 'bar',
-            data: {
-              labels: m.map(v => v.name),
-              datasets: [{
-                label: 'Операций',
-                data: m.map(v => v.count),
-                backgroundColor: '#2864ce',
-                borderRadius: 7
-              }]
-            },
-            options: {
-              indexAxis: 'y',
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } }
+      // Render Chart
+      const topM = mList.slice(0, 10);
+      const ctx = document.getElementById('opsChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: topM.map(m => shortenOpName(m.name)),
+          datasets: [{
+            label: 'Операциялар сони',
+            data: topM.map(m => m.count),
+            backgroundColor: topM.map(m => m.section.includes('ФРОНТ') ? '#3b82f6' : '#8b5cf6'),
+            borderRadius: 8
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: { left: 10, right: 20, top: 10, bottom: 10 }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: (items) => topM[items[0].dataIndex].name,
+                label: (c) => ` ${nf.format(c.parsed.x)} та операция (${topM[c.dataIndex].pct}%)`
+              }
             }
-          });
-        })
-        .catch(e => {
-          document.getElementById('name').textContent = 'Ошибка';
-          document.getElementById('meta').textContent = e.message;
-        });
+          },
+          scales: {
+            x: {
+              grid: { color: '#f1f5f9' },
+              ticks: { font: { family: 'Inter', size: 11 } }
+            },
+            y: {
+              grid: { display: false },
+              ticks: {
+                font: { family: 'Inter', size: 11, weight: '600' },
+                color: '#334155'
+              }
+            }
+          }
+        }
+      });
+
+      // Initialize icons
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function cleanBranchName(raw) {
+      if (!raw) return '—';
+      let s = String(raw).trim();
+      s = s.replace(/^\d{5}\s*-\s*[0-9A-Za-z]{4,5}\s*/, '');
+      s = s.replace(/^[0-9A-Za-z]{4,5}\s*-\s*/, '');
+      s = s.replace(/^\d{5}\s*/, '');
+      s = s.replace(/["']O[^\s]*zsanoatqurilishbank["']?\s*ATB\s*/gi, '');
+      s = s.replace(/ATB\s*/gi, '');
+      s = s.replace(/^[-"'\s\xa0]+|[-"'\s\xa0]+$/g, '');
+      s = s.replace(/bank\s+xizmatlar[i]?\s+markaz[i]?/gi, 'BXM');
+      s = s.replace(/bank\s+xizmatlar[i]?\s+ofis[i]?/gi, 'BXO');
+      s = s.replace(/центр\s+банковских\s+услуг/gi, 'BXM');
+      s = s.replace(/офис\s+банковских\s+услуг/gi, 'BXO');
+      return s.trim() || '—';
+    }
+
+    function shortenOpName(name) {
+      if (!name) return '';
+      let s = String(name).trim();
+      s = s.replace(/\s*\([\d,.]+\)$/, '');
+      s = s.replace(/Назоратчи кассир ролини бажарганда/i, 'Назоратчи кассир роли');
+      s = s.replace(/Кирим,\s*чиқим\s*хужжатини\s*текшириш,?\s*тасдиқлаш/i, 'Кирим/чиқим текшириш');
+      s = s.replace(/Коммунал\s*туловлар\s*\(кирим-чиқим\)/i, 'Коммунал тўловлар');
+      s = s.replace(/Амалга\s*оширилган\s*операциялар\s*сони\s*\(кирим-чиқим\)/i, 'Кирим-чиқим опер.');
+      s = s.replace(/ВАШ\s*(\d+[^\)]*)\s*\(сотиш-сотиб олиш\)/i, 'ВАШ $1');
+      s = s.replace(/Пластикдан\s*нақд\s*пул\s*ечиш/i, 'Пластик нақдлаш');
+      s = s.replace(/Банкоматга\s*пул\s*кўйиш/i, 'Банкомат тўлдириш');
+      return s.trim();
     }
   </script>
 </body>
