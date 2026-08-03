@@ -1316,24 +1316,24 @@
           let statusBadgeHTML = '';
           if (x.hr_status_code === 'maternity') {
             if (x.has_replacement) {
-              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff">🟣 Декретда</div>`;
+              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff">🟣 В декрете</div>`;
             } else {
-              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Ўринбосарсиз (Декрет)</div>`;
+              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Без замены (Декрет)</div>`;
             }
           } else if (x.hr_status_code === 'vacation') {
             if (x.has_replacement) {
-              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#e0f2fe;color:#075985;border:1px solid #bae6fd">🔵 Таътилда</div>`;
+              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#e0f2fe;color:#075985;border:1px solid #bae6fd">🔵 В отпуске</div>`;
             } else {
-              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Ўринбосарсиз (Таътил)</div>`;
+              statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Без замены (Отпуск)</div>`;
             }
           } else if (x.hr_status_code === 'temporary') {
-            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #fde68a">🟡 Вақтинча</div>`;
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fef3c7;color:#92400e;border:1px solid #fde68a">🟡 Вр. замещение</div>`;
           } else if (x.hr_status_code === 'sick') {
-            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Касал</div>`;
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Болен</div>`;
           } else if (x.hr_status_code === 'vacant') {
-            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">⚪ Вакант</div>`;
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">⚪ Вакансия</div>`;
           } else {
-            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">🟢 Ишлаяпти</div>`;
+            statusBadgeHTML = `<div style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-block;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">🟢 Работает</div>`;
           }
 
           let roleBadgeHTML = '';

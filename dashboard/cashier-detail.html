@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="uz">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kassir Profili va Analytics — SQB Arena</title>
+  <title>Профиль Кассира и Аналитика — SQB Arena</title>
 
   <!-- Fonts & Libraries -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -436,7 +436,7 @@
   <header>
     <a href="/dashboard/cashiers.html" class="back-link">
       <i data-lucide="arrow-left" style="width:16px;height:16px"></i>
-      Барча кассирлар рўйхатига қайтиш
+      Вернуться к списку кассиров
     </a>
     <div class="brand-title">SQB Cashier Intelligence</div>
   </header>
@@ -447,16 +447,16 @@
     <!-- Loading State -->
     <div id="loading" class="loading-state">
       <div class="spinner"></div>
-      <b style="font-size:16px;color:var(--text)">Кассир профили юкланмоқда...</b>
+      <b style="font-size:16px;color:var(--text)">Загрузка профиля кассира...</b>
     </div>
 
     <!-- Error State -->
     <div id="error-card" class="card" style="display:none;background:#fef2f2;border-color:#fca5a5;color:#991b1b;text-align:center;padding:40px">
       <i data-lucide="alert-triangle" style="width:48px;height:48px;margin:0 auto 12px;color:#dc2626"></i>
-      <h2 style="font-size:20px;margin-bottom:8px">Маълумотларни олишда хатолик</h2>
+      <h2 style="font-size:20px;margin-bottom:8px">Ошибка получения данных</h2>
       <p id="error-msg" style="font-size:14px;color:#7f1d1d"></p>
       <div style="margin-top:20px">
-        <a href="/dashboard/cashiers.html" class="back-link">Опцияни қайта уриниш</a>
+        <a href="/dashboard/cashiers.html" class="back-link">Повторить попытку</a>
       </div>
     </div>
 
@@ -472,7 +472,7 @@
               <h1 id="full-name">—</h1>
               <div class="hero-badges">
                 <span id="role-badge" class="badge-item badge-role-back">💼 БЭК-кассир</span>
-                <span id="branch-badge" class="badge-item badge-branch">🏛️ BXM / Filial</span>
+                <span id="branch-badge" class="badge-item badge-branch">🏛️ ЦБУ / Филиал</span>
               </div>
             </div>
           </div>
@@ -487,19 +487,19 @@
         <!-- Meta Grid -->
         <div class="hero-meta-grid">
           <div class="meta-item">
-            <span class="meta-label">Табель рақами</span>
+            <span class="meta-label">Табельный номер</span>
             <span class="meta-val" id="meta-tab">—</span>
           </div>
           <div class="meta-item">
-            <span class="meta-label">Сотрудник №</span>
+            <span class="meta-label">№ Сотрудника</span>
             <span class="meta-val" id="meta-emp">—</span>
           </div>
           <div class="meta-item">
-            <span class="meta-label">Лавозими</span>
+            <span class="meta-label">Должность</span>
             <span class="meta-val" id="meta-pos">—</span>
           </div>
           <div class="meta-item">
-            <span class="meta-label">Ишлаган куни</span>
+            <span class="meta-label">Отработано дней</span>
             <span class="meta-val" id="meta-days">—</span>
           </div>
         </div>
@@ -510,13 +510,13 @@
         <!-- Card 1: Score -->
         <div class="kpi-card">
           <div class="kpi-header">
-            <span class="kpi-title">Samaradorlik Balli</span>
+            <span class="kpi-title">Балл эффективности</span>
             <div class="kpi-icon" style="background:var(--emerald-gradient)">
               <i data-lucide="award" style="width:20px;height:20px"></i>
             </div>
           </div>
           <div class="kpi-val" id="kpi-score-val">—</div>
-          <div class="kpi-sub" id="kpi-score-grade">Baho: —</div>
+          <div class="kpi-sub" id="kpi-score-grade">Оценка: —</div>
           <div class="progress-track">
             <div id="kpi-score-bar" class="progress-fill" style="background:#10b981;width:0%"></div>
           </div>
@@ -525,13 +525,13 @@
         <!-- Card 2: Operations -->
         <div class="kpi-card">
           <div class="kpi-header">
-            <span class="kpi-title">Жами Операциялар</span>
+            <span class="kpi-title">Всего операций</span>
             <div class="kpi-icon" style="background:var(--primary-gradient)">
               <i data-lucide="layers" style="width:20px;height:20px"></i>
             </div>
           </div>
           <div class="kpi-val" id="kpi-ops-val">—</div>
-          <div class="kpi-sub" id="kpi-ops-perday">Кунига: — опер.</div>
+          <div class="kpi-sub" id="kpi-ops-perday">В день в среднем: — опер.</div>
           <div class="progress-track">
             <div id="kpi-ops-bar" class="progress-fill" style="background:#3b82f6;width:0%"></div>
           </div>
@@ -540,7 +540,7 @@
         <!-- Card 3: Workload -->
         <div class="kpi-card">
           <div class="kpi-header">
-            <span class="kpi-title">Юклама Даражаси</span>
+            <span class="kpi-title">Уровень нагрузки</span>
             <div class="kpi-icon" style="background:var(--amber-gradient)">
               <i data-lucide="activity" style="width:20px;height:20px"></i>
             </div>
@@ -555,13 +555,13 @@
         <!-- Card 4: Speed -->
         <div class="kpi-card">
           <div class="kpi-header">
-            <span class="kpi-title">Операция Тезлиги</span>
+            <span class="kpi-title">Скорость операций</span>
             <div class="kpi-icon" style="background:var(--purple-gradient)">
               <i data-lucide="zap" style="width:20px;height:20px"></i>
             </div>
           </div>
           <div class="kpi-val" id="kpi-speed-val">—</div>
-          <div class="kpi-sub" id="kpi-speed-hours">Иш соати: —</div>
+          <div class="kpi-sub" id="kpi-speed-hours">Отработано: —</div>
           <div class="progress-track">
             <div id="kpi-speed-bar" class="progress-fill" style="background:#8b5cf6;width:80%"></div>
           </div>
@@ -573,7 +573,7 @@
         <!-- Chart Card -->
         <div class="card">
           <div class="card-title">
-            <span>📊 Операциялар Профили Tahlili</span>
+            <span>📊 Анализ профиля операций</span>
           </div>
           <div class="chart-box">
             <canvas id="opsChart"></canvas>
@@ -583,7 +583,7 @@
         <!-- Key Metrics Table Card -->
         <div class="card">
           <div class="card-title">
-            <span>⚙️ Асосий Кўрсаткичлар</span>
+            <span>⚙️ Основные показатели</span>
           </div>
           <div class="table-wrapper">
             <table>
@@ -596,17 +596,17 @@
       <!-- Full Operations Detail Table -->
       <section class="card">
         <div class="card-title">
-          <span>📋 Ходим Бажараётган Барча Операциялар Тўлиқ Рўйхати</span>
+          <span>📋 Полный список всех операций сотрудника</span>
         </div>
         <div class="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>Операция номи</th>
-                <th>Бўлим (Тип)</th>
-                <th>Сони</th>
-                <th>Улуш (%)</th>
-                <th>Вақт (минут)</th>
+                <th>Наименование операции</th>
+                <th>Раздел (Тип)</th>
+                <th>Количество</th>
+                <th>Доля (%)</th>
+                <th>Время (минут)</th>
               </tr>
             </thead>
             <tbody id="all-ops-body"></tbody>
@@ -628,7 +628,7 @@
     const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
     if (!cashierId) {
-      showError('Кассир ID-си кўрсатилмаган. Илтимос, рўйхатдан қайта танланг.');
+      showError('ID кассира не указан. Пожалуйста, выберите кассира из списка.');
     } else {
       fetchCashierDetail(cashierId);
     }
@@ -637,7 +637,7 @@
       try {
         const resp = await fetch(`${baseApi}/api/cashiers/${id}`);
         if (!resp.ok) {
-          throw new Error('Кассир маълумотлари топилмади.');
+          throw new Error('Данные кассира не найдены.');
         }
         const data = await resp.json();
         renderCashierProfile(data);
@@ -658,7 +658,7 @@
       document.getElementById('content').style.display = 'flex';
 
       // Page Title
-      document.title = `${x.full_name} — Аналитика profili`;
+      document.title = `${x.full_name} — Профиль кассира`;
 
       // Hero Elements
       const initials = (x.full_name || '').split(' ').slice(0, 2).map(n => n[0] || '').join('').toUpperCase() || 'K';
@@ -694,19 +694,19 @@
         hrBanner.style.background = '#fef3c7';
         hrBanner.style.color = '#92400e';
         hrBanner.style.border = '1px solid #fde68a';
-        hrBanner.innerHTML = `🟡 <b>Вақтинча ўринбосар ходим:</b> ${x.full_name} асосий штатдаги <b>${x.replacing_full_name}</b> ўрнини эгаллаган.`;
+        hrBanner.innerHTML = `🟡 <b>Временный замещающий:</b> ${x.full_name} временно замещает штатную единицу: <b>${x.replacing_full_name}</b>`;
       } else if (x.replaced_by_full_name) {
         hrBanner.style.display = 'flex';
         hrBanner.style.background = '#f3e8ff';
         hrBanner.style.color = '#6b21a8';
         hrBanner.style.border = '1px solid #e9d5ff';
-        hrBanner.innerHTML = `🟣 <b>Декрет/Таътилда (Ўринбосар бор):</b> ${x.full_name} ўрнида вақтинча <b>${x.replaced_by_full_name}</b> ишламоқда.`;
+        hrBanner.innerHTML = `🟣 <b>В декрете / отпуске (Замещение есть):</b> На месте сотрудника временно работает <b>${x.replaced_by_full_name}</b>`;
       } else if (sc !== 'active' && sc !== 'vacant' && !x.has_replacement) {
         hrBanner.style.display = 'flex';
         hrBanner.style.background = '#fee2e2';
         hrBanner.style.color = '#991b1b';
         hrBanner.style.border = '1px solid #fca5a5';
-        hrBanner.innerHTML = `🔴 <b>⚠️ Диққат: Ўринбосар йўқ!</b> Ходим декрет/таътилда, аммо вақтинчалик <b>ўринбосар тайинланмаган</b>.`;
+        hrBanner.innerHTML = `🔴 <b>⚠️ Внимание: Замещение отсутствует!</b> Сотрудник в декрете/отпуске, но временный замещающий <b>не назначен</b>.`;
       } else {
         hrBanner.style.display = 'none';
       }
@@ -715,58 +715,58 @@
       document.getElementById('meta-tab').textContent = x.tab_number || '—';
       document.getElementById('meta-emp').textContent = x.employee_number || '—';
       document.getElementById('meta-pos').textContent = x.position || '—';
-      document.getElementById('meta-days').textContent = `${x.days_worked || 0} кун (${x.days_worked_pct || 0}% нормага нисбатан)`;
+      document.getElementById('meta-days').textContent = `${x.days_worked || 0} дн. (${x.days_worked_pct || 0}% от нормы)`;
 
       // KPI Highlight Cards
       document.getElementById('kpi-score-val').textContent = score;
-      document.getElementById('kpi-score-grade').textContent = `Баҳо: ${x.efficiency_grade || 'Low Load'}`;
+      document.getElementById('kpi-score-grade').textContent = `Оценка: ${x.efficiency_grade || 'Low Load'}`;
       document.getElementById('kpi-score-bar').style.width = `${Math.min(score, 100)}%`;
 
       document.getElementById('kpi-ops-val').textContent = nf.format(x.operations_count);
-      document.getElementById('kpi-ops-perday').textContent = `Кунига ўртача: ${x.operations_per_day || 0} опер.`;
+      document.getElementById('kpi-ops-perday').textContent = `В день в среднем: ${x.operations_per_day || 0} опер.`;
       document.getElementById('kpi-ops-bar').style.width = `${Math.min((x.operations_count / 15000) * 100, 100)}%`;
 
       document.getElementById('kpi-load-val').textContent = `${x.load_percent || 0}%`;
       if (x.load_percent > 100) {
-        document.getElementById('kpi-load-sub').innerHTML = `<span style="color:#dc2626;font-weight:800">🔥 +${(x.load_percent - 100).toFixed(1)}% ортиқча юклама</span>`;
+        document.getElementById('kpi-load-sub').innerHTML = `<span style="color:#dc2626;font-weight:800">🔥 +${(x.load_percent - 100).toFixed(1)}% превышение нагрузки</span>`;
       } else {
-        document.getElementById('kpi-load-sub').textContent = `Нормага нисбатан: ${x.load_percent || 0}%`;
+        document.getElementById('kpi-load-sub').textContent = `От нормы: ${x.load_percent || 0}%`;
       }
       document.getElementById('kpi-load-bar').style.width = `${Math.min(x.load_percent, 100)}%`;
 
-      document.getElementById('kpi-speed-val').textContent = `${x.avg_seconds_per_operation || 0} сония`;
-      document.getElementById('kpi-speed-hours').textContent = `Жами: ${x.hours_str || '0 ч 0 мин'}`;
+      document.getElementById('kpi-speed-val').textContent = `${x.avg_seconds_per_operation || 0} сек.`;
+      document.getElementById('kpi-speed-hours').textContent = `Всего: ${x.hours_str || '0 ч 0 мин'}`;
 
       // Core Metrics Table
       const coreTbody = document.getElementById('core-metrics-body');
       coreTbody.innerHTML = `
         <tr>
-          <th>Рейтинг (Ўрни)</th>
+          <th>Рейтинг (Место)</th>
           <td><b>#${x.rank_by_operations || '—'}</b> (${x.percentile || 0}-перцентиль)</td>
         </tr>
         <tr>
-          <th>HR Статуси</th>
-          <td><b>${x.hr_status_label || '🟢 Ишлаяпти'}</b></td>
+          <th>Статус HR</th>
+          <td><b>${x.hr_status_label || '🟢 Работает'}</b></td>
         </tr>
         <tr>
-          <th>Филиал / БХМ</th>
-          <td>${x.branch_name || 'Не указан'}</td>
+          <th>Филиал / ЦБУ</th>
+          <td>${cleanBranchName(x.branch_name) || 'Не указан'}</td>
         </tr>
         <tr>
-          <th>Ишлаган вақти</th>
+          <th>Отработанное время</th>
           <td><b>${nf.format(x.operations_minutes)} минут</b> (${x.hours_str || ''})</td>
         </tr>
         <tr>
-          <th>БЭК-операциялар</th>
+          <th>БЭК-операции</th>
           <td><b>${nf.format(x.bek_count)}</b> (${x.bek_pct || 0}%) / ${nf.format(x.bek_minutes)} мин</td>
         </tr>
         <tr>
-          <th>ФРОНТ-операциялар</th>
+          <th>ФРОНТ-операции</th>
           <td><b>${nf.format(x.front_count)}</b> (${x.front_pct || 0}%) / ${nf.format(x.front_minutes)} мин</td>
         </tr>
         <tr>
-          <th>Ўртача вақт</th>
-          <td>${x.avg_seconds_per_operation} сония (1 операция учун)</td>
+          <th>Среднее время</th>
+          <td>${x.avg_seconds_per_operation} сек. (на 1 операцию)</td>
         </tr>
       `;
 
@@ -774,7 +774,7 @@
       const mList = x.metrics || [];
       const allOpsTbody = document.getElementById('all-ops-body');
       if (mList.length === 0) {
-        allOpsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">Операциялар маълумоти йўқ</td></tr>`;
+        allOpsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">Данные об операциях отсутствуют</td></tr>`;
       } else {
         allOpsTbody.innerHTML = mList.map(m => {
           const isFront = m.section.includes('ФРОНТ');
@@ -799,7 +799,7 @@
         data: {
           labels: topM.map(m => shortenOpName(m.name)),
           datasets: [{
-            label: 'Операциялар сони',
+            label: 'Количество операций',
             data: topM.map(m => m.count),
             backgroundColor: topM.map(m => m.section.includes('ФРОНТ') ? '#3b82f6' : '#8b5cf6'),
             borderRadius: 8
@@ -817,7 +817,7 @@
             tooltip: {
               callbacks: {
                 title: (items) => topM[items[0].dataIndex].name,
-                label: (c) => ` ${nf.format(c.parsed.x)} та операция (${topM[c.dataIndex].pct}%)`
+                label: (c) => ` ${nf.format(c.parsed.x)} опер. (${topM[c.dataIndex].pct}%)`
               }
             }
           },
@@ -850,10 +850,10 @@
       s = s.replace(/["']O[^\s]*zsanoatqurilishbank["']?\s*ATB\s*/gi, '');
       s = s.replace(/ATB\s*/gi, '');
       s = s.replace(/^[-"'\s\xa0]+|[-"'\s\xa0]+$/g, '');
-      s = s.replace(/bank\s+xizmatlar[i]?\s+markaz[i]?/gi, 'BXM');
-      s = s.replace(/bank\s+xizmatlar[i]?\s+ofis[i]?/gi, 'BXO');
-      s = s.replace(/центр\s+банковских\s+услуг/gi, 'BXM');
-      s = s.replace(/офис\s+банковских\s+услуг/gi, 'BXO');
+      s = s.replace(/bank\s+xizmatlar[i]?\s+markaz[i]?/gi, 'ЦБУ');
+      s = s.replace(/bank\s+xizmatlar[i]?\s+ofis[i]?/gi, 'ОБУ');
+      s = s.replace(/центр\s+банковских\s+услуг/gi, 'ЦБУ');
+      s = s.replace(/офис\s+банковских\s+услуг/gi, 'ОБУ');
       return s.trim() || '—';
     }
 
@@ -861,13 +861,13 @@
       if (!name) return '';
       let s = String(name).trim();
       s = s.replace(/\s*\([\d,.]+\)$/, '');
-      s = s.replace(/Назоратчи кассир ролини бажарганда/i, 'Назоратчи кассир роли');
-      s = s.replace(/Кирим,\s*чиқим\s*хужжатини\s*текшириш,?\s*тасдиқлаш/i, 'Кирим/чиқим текшириш');
-      s = s.replace(/Коммунал\s*туловлар\s*\(кирим-чиқим\)/i, 'Коммунал тўловлар');
-      s = s.replace(/Амалга\s*оширилган\s*операциялар\s*сони\s*\(кирим-чиқим\)/i, 'Кирим-чиқим опер.');
+      s = s.replace(/Назоратчи кассир ролини бажарганда/i, 'Роль контроллера-кассира');
+      s = s.replace(/Кирим,\s*чиқим\s*хужжатини\s*текшириш,?\s*тасдиқлаш/i, 'Проверка прих./расх. док.');
+      s = s.replace(/Коммунал\s*туловлар\s*\(кирим-чиқим\)/i, 'Коммунальные платежи');
+      s = s.replace(/Амалга\s*оширилган\s*операциялар\s*сони\s*\(кирим-чиқим\)/i, 'Прих.-расх. операции');
       s = s.replace(/ВАШ\s*(\d+[^\)]*)\s*\(сотиш-сотиб олиш\)/i, 'ВАШ $1');
-      s = s.replace(/Пластикдан\s*нақд\s*пул\s*ечиш/i, 'Пластик нақдлаш');
-      s = s.replace(/Банкоматга\s*пул\s*кўйиш/i, 'Банкомат тўлдириш');
+      s = s.replace(/Пластикдан\s*нақд\s*пул\s*ечиш/i, 'Снятие с карты');
+      s = s.replace(/Банкоматга\s*пул\s*кўйиш/i, 'Загрузка банкомата');
       return s.trim();
     }
   </script>

@@ -43,10 +43,10 @@ def clean_branch_name(raw_branch: str) -> str:
     s = re.sub(r'["\']O[^\s]*zsanoatqurilishbank["\']?\s*ATB\s*', '', s, flags=re.IGNORECASE)
     s = re.sub(r'ATB\s*', '', s, flags=re.IGNORECASE)
     s = s.strip(' -"\'' + '\xa0')
-    s = re.sub(r'bank\s+xizmatlar[i]?\s+markaz[i]?', 'BXM', s, flags=re.IGNORECASE)
-    s = re.sub(r'bank\s+xizmatlar[i]?\s+ofis[i]?', 'BXO', s, flags=re.IGNORECASE)
-    s = re.sub(r'центр\s+банковских\s+услуг', 'BXM', s, flags=re.IGNORECASE)
-    s = re.sub(r'офис\s+банковских\s+услуг', 'BXO', s, flags=re.IGNORECASE)
+    s = re.sub(r'bank\s+xizmatlar[i]?\s+markaz[i]?', 'ЦБУ', s, flags=re.IGNORECASE)
+    s = re.sub(r'bank\s+xizmatlar[i]?\s+ofis[i]?', 'ОБУ', s, flags=re.IGNORECASE)
+    s = re.sub(r'центр\s+банковских\s+услуг', 'ЦБУ', s, flags=re.IGNORECASE)
+    s = re.sub(r'офис\s+банковских\s+услуг', 'ОБУ', s, flags=re.IGNORECASE)
     return s.strip()
 
 
@@ -1265,7 +1265,9 @@ def cashier_analytics(
         st_q = str(status).strip().lower()
         if st_q == 'no_replacement':
             rows = [x for x in rows if x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity')]
-        elif st_q in ('active', 'vacation', 'maternity', 'temporary', 'vacant', 'sick'):
+        elif st_q in ('vacation', 'maternity'):
+            rows = [x for x in rows if x.get('hr_status_code') == st_q and x.get('has_replacement') != 0]
+        elif st_q in ('active', 'temporary', 'vacant', 'sick'):
             rows = [x for x in rows if x.get('hr_status_code') == st_q]
 
     if position and str(position).strip():
