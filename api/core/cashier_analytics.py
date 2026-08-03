@@ -97,24 +97,17 @@ def sval(v) -> str:
     return s.strip()
 
 
-# ── Operation group classification ─────────────────────────────────────────
-
 # Keywords used to classify operation names into BEK (back-office) or FRONT groups.
-# Matching is done on the normalised operation name from the header.
 BACK_KEYWORDS = (
-    'кирим чиким', 'кирим чиким',           # income/expense operations
-    'банкомат', 'atm',                        # ATM cash loading
-    'касса мудири', 'kassa mudiri',           # cash manager role
-    'кечки кассир', 'kechki kassir',          # evening cashier role
-    'назоратчи', 'nazoratchi',                # controller role
-    'купюра', 'kupyura',                      # banknote counting
-    'хужжат', 'hujjat', 'тасдиклаш',         # document processing
+    'амалга оширилган операциялар сони',
+    'банкомат',
+    'касса мудири',
+    'кечки кассир',
+    'назоратчи',
+    'купюра санаш',
 )
 FRONT_KEYWORDS = (
-    'ваш', 'валюта', 'currency', 'vash',     # FX operations
-    'коммунал', 'kommunal',                   # utility payments
-    'пластик карта таркатиш', 'karta tarqatish',  # card issue
-    'пластикдан', 'plastikdan', 'накд пул',  # cash-from-card
+    'ваш', 'валюта', 'коммунал', 'пластик', 'накд', 'кирим чиким хужжати',
 )
 SUMMARY_KEYWORDS = (
     'жами бек', 'jami bek', 'жами фронт', 'jami front',
@@ -130,9 +123,9 @@ BACK_GROUPS = {
     'Кечки кассир',
     'Назоратчи кассир ролини бажарганда',
     'Купюра санаш',
-    'Кирим, чиқим ҳужжатини текшириш, расмийлаштириш',
 }
 FRONT_GROUPS = {
+    'Кирим, чиқим ҳужжатини текшириш, расмийлаштириш',
     'ВАЛЮТА 100$',
     'ВАЛЮТА 100,01–1000$',
     'ВАЛЮТА 1000,01–5000$',
@@ -253,14 +246,12 @@ def init_cashier_tables():
 
 def _classify_op_group(op_name: str) -> str:
     """Classify an operation name into 'back', 'front', or 'summary'."""
-    n = norm(op_name).replace(' ', '')
-    if any(kw.replace(' ', '') in n for kw in SUMMARY_KEYWORDS):
+    n = norm(op_name)
+    if any(kw in n for kw in SUMMARY_KEYWORDS):
         return 'summary'
-    if any(kw.replace(' ', '') in n for kw in BACK_KEYWORDS):
+    if any(kw in n for kw in BACK_KEYWORDS):
         return 'back'
-    if any(kw.replace(' ', '') in n for kw in FRONT_KEYWORDS):
-        return 'front'
-    return 'other'
+    return 'front'
 
 
 def _find_header_rows(all_rows: list) -> Tuple[int, int, int]:
@@ -1124,9 +1115,7 @@ def _enrich(x: dict, detail: bool = False):
     x['metrics'] = [
         {
             'name': n,
-            'section': ('БЭК-операции' if any(b in norm(n).replace(' ', '') for b in ('кирим', 'банкомат', 'касса', 'кечки', 'назоратчи', 'купюра', 'хужжат'))
-                        else 'ФРОНТ-операции' if any(f in norm(n).replace(' ', '') for f in ('ваш', 'валюта', 'коммунал', 'пластик', 'накд'))
-                        else 'Прочее'),
+            'section': ('БЭК-операции' if _classify_op_group(n) == 'back' else 'ФРОНТ-операции'),
             'count': v.get('count', 0),
             'minutes': v.get('minutes', 0),
             'pct': round(v.get('count', 0) / real_ops_total * 100, 1),
