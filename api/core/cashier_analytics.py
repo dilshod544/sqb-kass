@@ -1264,10 +1264,10 @@ def cashier_analytics(
     if status and str(status).strip():
         st_q = str(status).strip().lower()
         if st_q == 'no_replacement':
-            rows = [x for x in rows if x.get('has_replacement') == 0 and x.get('hr_status_code') in ('vacation', 'maternity')]
-        elif st_q in ('vacation', 'maternity'):
-            rows = [x for x in rows if x.get('hr_status_code') == st_q and x.get('has_replacement') != 0]
-        elif st_q in ('active', 'temporary', 'vacant', 'sick'):
+            rows = [x for x in rows if x.get('has_replacement') == 0 and x.get('hr_status_code') == 'maternity']
+        elif st_q == 'maternity':
+            rows = [x for x in rows if x.get('hr_status_code') == 'maternity' and x.get('has_replacement') != 0]
+        elif st_q in ('active', 'vacation', 'temporary', 'vacant', 'sick'):
             rows = [x for x in rows if x.get('hr_status_code') == st_q]
 
     if position and str(position).strip():
